@@ -521,3 +521,48 @@ code, pre {
     display: none;
   }
 }
+
+/* Monthly Detail View - Scrollable Table Styles */
+.overflow-x-auto {
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+  height: 12px;
+  width: 12px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+  border: 2px solid #f1f5f9;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Sticky positioning for monthly table */
+table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+table tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+
+table thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+}
