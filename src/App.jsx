@@ -1022,4 +1022,3 @@ export default function DrumWaveWalmartTool() {
     </div>
   );
 }
-export default RevenueCalculator;
