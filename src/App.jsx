@@ -214,6 +214,195 @@ const PRESETS = {
   }
 };
 
+// Default Retailer Network Profiles
+const DEFAULT_RETAILERS = [
+  {
+    id: 'walmart',
+    name: 'Walmart',
+    totalCustomers: 120000000,
+    dwalletAdoption: 0.70,
+    activeConsent: 0.80,
+    annualTransactions: 65,
+    launchMonth: 0, // Month they join network (0 = from start)
+    color: '#0071CE', // Walmart blue
+    brandStartPct: 0.05,
+    brandEndPct: 1.0,
+    monthsToFull: 36,
+    itemFloor: 2,
+    itemCeiling: 8
+  },
+  {
+    id: 'target',
+    name: 'Target',
+    totalCustomers: 75000000,
+    dwalletAdoption: 0.65,
+    activeConsent: 0.75,
+    annualTransactions: 48,
+    launchMonth: 6,
+    color: '#CC0000', // Target red
+    brandStartPct: 0.08,
+    brandEndPct: 1.0,
+    monthsToFull: 30,
+    itemFloor: 2,
+    itemCeiling: 7
+  },
+  {
+    id: 'kroger',
+    name: 'Kroger',
+    totalCustomers: 60000000,
+    dwalletAdoption: 0.60,
+    activeConsent: 0.70,
+    annualTransactions: 52,
+    launchMonth: 12,
+    color: '#003DA5', // Kroger blue
+    brandStartPct: 0.10,
+    brandEndPct: 1.0,
+    monthsToFull: 24,
+    itemFloor: 2,
+    itemCeiling: 6
+  },
+  {
+    id: 'cvs',
+    name: 'CVS',
+    totalCustomers: 90000000,
+    dwalletAdoption: 0.55,
+    activeConsent: 0.68,
+    annualTransactions: 38,
+    launchMonth: 18,
+    color: '#CC0000', // CVS red
+    brandStartPct: 0.12,
+    brandEndPct: 1.0,
+    monthsToFull: 24,
+    itemFloor: 1,
+    itemCeiling: 5
+  },
+  {
+    id: 'costco',
+    name: 'Costco',
+    totalCustomers: 65000000,
+    dwalletAdoption: 0.68,
+    activeConsent: 0.78,
+    annualTransactions: 28,
+    launchMonth: 24,
+    color: '#0066B2', // Costco blue
+    brandStartPct: 0.08,
+    brandEndPct: 1.0,
+    monthsToFull: 24,
+    itemFloor: 3,
+    itemCeiling: 10
+  }
+];
+
+// Metcalfe's Law Network Value Calculator
+function calculateMetcalfeValue(numActiveRetailers, maxRetailers = 10, baseCoefficient = 0.5) {
+  // Metcalfe's Law: Value ∝ n²
+  // Network premium = baseCoefficient × (n² / n_max²)
+  // Returns multiplier for license fees (1.0 = no premium, 2.0 = 100% premium)
+  const networkEffect = baseCoefficient * Math.pow(numActiveRetailers / maxRetailers, 2);
+  return 1 + networkEffect;
+}
+
+// Calculate retailer results with network awareness
+function calculateRetailerResults(retailer, month, mintingFee, licenseFee, usesPerCertPerYear, networkMultiplier = 1.0) {
+  // Only calculate if retailer has launched
+  if (month < retailer.launchMonth) {
+    return {
+      certsMinted: 0,
+      activeCertPool: 0,
+      mintingRevenue: 0,
+      licensingRevenue: 0,
+      consumerEarnings: 0
+    };
+  }
+  
+  const monthsSinceLaunch = month - retailer.launchMonth;
+  const effectiveOptIn = retailer.dwalletAdoption * retailer.activeConsent;
+  const optedInCustomers = retailer.totalCustomers * effectiveOptIn;
+  const monthlyTransactionsPerCustomer = retailer.annualTransactions / 12;
+  
+  // Brand participation (sigmoid)
+  const brandParticipation = calculateBrandParticipation(
+    monthsSinceLaunch, 
+    retailer.brandStartPct, 
+    retailer.brandEndPct, 
+    retailer.monthsToFull
+  );
+  
+  // Dynamic eligible items
+  const avgEligibleItems = retailer.itemFloor + (brandParticipation * (retailer.itemCeiling - retailer.itemFloor));
+  
+  // Transaction volume
+  const totalMonthlyTransactions = optedInCustomers * monthlyTransactionsPerCustomer;
+  
+  // Certificate minting
+  const certsMintedThisMonth = totalMonthlyTransactions * avgEligibleItems * brandParticipation;
+  
+  // Simplified pool calculation (for network aggregation, we'll use rolling window elsewhere)
+  const activeCertPool = certsMintedThisMonth * Math.min(12, monthsSinceLaunch + 1);
+  
+  // Minting revenue (no network effect on minting)
+  const totalMintingRevenue = certsMintedThisMonth * mintingFee;
+  const retailerMintingRevenue = totalMintingRevenue * 0.50;
+  const consumerMintingBenefit = totalMintingRevenue * 0.50;
+  
+  // Licensing revenue (WITH network multiplier)
+  const monthlyLicensingEvents = activeCertPool * usesPerCertPerYear / 12;
+  const adjustedLicenseFee = licenseFee * networkMultiplier; // Network premium applied here
+  const grossLicensingRevenue = monthlyLicensingEvents * adjustedLicenseFee;
+  const retailerLicensing = grossLicensingRevenue * 0.06;
+  const consumerLicensing = grossLicensingRevenue * 0.60;
+  
+  return {
+    certsMinted: certsMintedThisMonth,
+    activeCertPool: activeCertPool,
+    mintingRevenue: retailerMintingRevenue,
+    licensingRevenue: retailerLicensing,
+    totalRevenue: retailerMintingRevenue + retailerLicensing,
+    consumerEarnings: consumerMintingBenefit + consumerLicensing,
+    brandParticipation: brandParticipation,
+    effectiveOptIn: effectiveOptIn
+  };
+}
+
+// Calculate full network results across all retailers
+function calculateNetworkResults(retailers, mintingFee, licenseFee, usesPerCertPerYear, metcalfeCoefficient = 0.5) {
+  const monthlyResults = [];
+  
+  for (let month = 0; month < 36; month++) {
+    // Determine how many retailers are active this month
+    const activeRetailers = retailers.filter(r => month >= r.launchMonth).length;
+    
+    // Calculate Metcalfe multiplier based on active retailers
+    const networkMultiplier = calculateMetcalfeValue(activeRetailers, 10, metcalfeCoefficient);
+    
+    // Calculate results for each retailer
+    const retailerMonthResults = retailers.map(retailer => ({
+      retailerId: retailer.id,
+      retailerName: retailer.name,
+      ...calculateRetailerResults(retailer, month, mintingFee, licenseFee, usesPerCertPerYear, networkMultiplier)
+    }));
+    
+    // Aggregate totals
+    const aggregateCerts = retailerMonthResults.reduce((sum, r) => sum + r.certsMinted, 0);
+    const aggregatePool = retailerMonthResults.reduce((sum, r) => sum + r.activeCertPool, 0);
+    const aggregateRetailerRevenue = retailerMonthResults.reduce((sum, r) => sum + r.totalRevenue, 0);
+    const aggregateConsumerEarnings = retailerMonthResults.reduce((sum, r) => sum + r.consumerEarnings, 0);
+    
+    monthlyResults.push({
+      month: month + 1,
+      activeRetailers: activeRetailers,
+      networkMultiplier: networkMultiplier,
+      retailers: retailerMonthResults,
+      aggregateCertsMinted: aggregateCerts,
+      aggregateActiveCertPool: aggregatePool,
+      aggregateRetailerRevenue: aggregateRetailerRevenue,
+      aggregateConsumerEarnings: aggregateConsumerEarnings
+    });
+  }
+  
+  return monthlyResults;
+}
+
 // ==================== UTILITY FUNCTIONS ====================
 
 function formatCurrency(value, decimals = 0) {
@@ -251,6 +440,11 @@ export default function DrumWaveWalmartTool() {
   const [networkSize, setNetworkSize] = useState(1);
   const [showNetworkEffects, setShowNetworkEffects] = useState(false);
   const [customAssumptions, setCustomAssumptions] = useState(null);
+  
+  // Network retailers state
+  const [networkRetailers, setNetworkRetailers] = useState(DEFAULT_RETAILERS);
+  const [metcalfeCoefficient, setMetcalfeCoefficient] = useState(0.5);
+  const [showRetailerConfig, setShowRetailerConfig] = useState(false);
 
   const assumptions = customMode && customAssumptions ? customAssumptions : PRESETS[scenario];
   const effectiveOptIn = assumptions.dwalletAdoption * assumptions.activeConsent;
@@ -263,6 +457,18 @@ export default function DrumWaveWalmartTool() {
   const networkResults = useMemo(
     () => calculateNetworkScenario(singleRetailerResults, networkSize, effectiveOptIn),
     [singleRetailerResults, networkSize, effectiveOptIn]
+  );
+  
+  // New: Full network results with actual retailer volumes
+  const fullNetworkResults = useMemo(
+    () => calculateNetworkResults(
+      networkRetailers, 
+      assumptions.mintingFee, 
+      assumptions.licenseFee, 
+      assumptions.usesPerCertPerYear,
+      metcalfeCoefficient
+    ),
+    [networkRetailers, assumptions.mintingFee, assumptions.licenseFee, assumptions.usesPerCertPerYear, metcalfeCoefficient]
   );
 
   const month36 = singleRetailerResults[35];
@@ -684,131 +890,345 @@ export default function DrumWaveWalmartTool() {
   };
 
   const NetworkView = () => {
-    const networkSizes = [1, 2, 3, 5];
-    const barData = networkSizes.map(size => {
-      const results = calculateNetworkScenario(singleRetailerResults, size, effectiveOptIn);
-      const total = results.reduce((sum, r) => sum + r.retailerTotal, 0);
-      const minting = results.reduce((sum, r) => sum + r.mintingComponent, 0);
-      const licensing = results.reduce((sum, r) => sum + r.licensingComponent, 0);
+    // Get network month 36 aggregate data
+    const networkMonth36 = fullNetworkResults[35];
+    const totalNetworkRevenue = networkMonth36.aggregateRetailerRevenue;
+    const totalConsumerEarnings = networkMonth36.aggregateConsumerEarnings;
+    const totalCertPool = networkMonth36.aggregateActiveCertPool;
+    
+    // Prepare chart data showing certificate volume by retailer over time
+    const chartData = fullNetworkResults.map(month => {
+      const dataPoint = { month: month.month };
+      month.retailers.forEach(r => {
+        if (r.activeCertPool > 0) {
+          dataPoint[r.retailerName] = r.activeCertPool / 1000000; // Convert to millions
+        }
+      });
+      dataPoint.networkMultiplier = month.networkMultiplier;
+      return dataPoint;
+    });
+    
+    // Retailer colors for chart
+    const retailerColors = {
+      'Walmart': '#0071CE',
+      'Target': '#CC0000',
+      'Kroger': '#003DA5',
+      'CVS': '#E87722',
+      'Costco': '#0066B2'
+    };
+    
+    // Calculate 36-month totals by retailer
+    const retailerTotals = networkRetailers.map(retailer => {
+      const retailerResults = fullNetworkResults
+        .map(m => m.retailers.find(r => r.retailerId === retailer.id))
+        .filter(r => r);
+      
+      const total36MonthRevenue = retailerResults.reduce((sum, r) => sum + r.totalRevenue, 0);
+      const total36MonthConsumer = retailerResults.reduce((sum, r) => sum + r.consumerEarnings, 0);
+      const month36Certs = retailerResults[retailerResults.length - 1]?.activeCertPool || 0;
       
       return {
-        retailers: size === 1 ? 'Walmart Only' : `${size} Retailers`,
-        total: total / 1000000000,
-        minting: minting / 1000000000,
-        licensing: licensing / 1000000000,
-        multiplier: size === 1 ? '1.0×' : `${(total / cumulativeRetailer).toFixed(1)}×`
+        ...retailer,
+        totalRevenue: total36MonthRevenue,
+        totalConsumer: total36MonthConsumer,
+        finalCertPool: month36Certs
       };
     });
-
-    // Get multipliers for display (using the current network size from Executive Summary)
-    const displaySize = showNetworkEffects ? networkSize : 1;
-    const reuseMultiplier = calculateReuseMultiplier(displaySize, 4);
-    const currentAdoption = calculateAdoptionLift(displaySize, effectiveOptIn);
-    const pricePremium = calculatePricePremium(displaySize);
-
+    
     return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Network Effects: Multi-Retailer Value Comparison</h2>
-          <p className="text-gray-600">{scenario} Scenario ({formatPercent(effectiveOptIn)} adoption, {assumptions.annualTransactions} txns/year)</p>
-          {showNetworkEffects && (
-            <p className="text-sm text-green-600 font-semibold mt-1">
-              Currently showing: {displaySize} retailer{displaySize > 1 ? 's' : ''} (selected in Executive Summary)
-            </p>
-          )}
+      <div className="space-y-8">
+        <div className="text-center mb-6">
+          <h2 className="text-4xl font-bold text-gray-900 mb-3" style={{ letterSpacing: '-0.02em' }}>
+            Network Effects: Multi-Retailer Platform
+          </h2>
+          <p className="text-xl text-gray-600">Real certificate volumes + Metcalfe's Law network value</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Walmart 36-Month Revenue by Network Size</h3>
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={barData} layout="vertical">
+        {/* Metcalfe Coefficient Control */}
+        <div className="control-panel">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Network Value Formula (Metcalfe's Law)</h3>
+              <p className="text-sm text-gray-600">License Fee Multiplier = 1 + (k × n² / n_max²)</p>
+            </div>
+            <button
+              onClick={() => setShowRetailerConfig(!showRetailerConfig)}
+              className="scenario-button inactive"
+            >
+              {showRetailerConfig ? 'Hide' : 'Configure'} Retailers
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <div className="flex-1">
+              <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                Network Coefficient (k): {metcalfeCoefficient.toFixed(2)}
+              </label>
+              <input
+                type="range"
+                min="0.1"
+                max="1.0"
+                step="0.05"
+                value={metcalfeCoefficient}
+                onChange={(e) => setMetcalfeCoefficient(parseFloat(e.target.value))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Conservative (0.1)</span>
+                <span>Aggressive (1.0)</span>
+              </div>
+            </div>
+            
+            <div className="scorecard" style={{ minWidth: '200px' }}>
+              <div className="scorecard-label">NETWORK MULTIPLIER</div>
+              <div className="scorecard-value" style={{ fontSize: '2rem' }}>
+                {networkMonth36.networkMultiplier.toFixed(2)}×
+              </div>
+              <div className="scorecard-subtitle">Month 36 (5 retailers)</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Retailer Configuration Panel */}
+        {showRetailerConfig && (
+          <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-blue-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Retailer Network Configuration</h3>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {networkRetailers.map((retailer, idx) => (
+                <div key={retailer.id} className="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-colors">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-4 h-4 rounded" style={{ backgroundColor: retailer.color }}></div>
+                    <input
+                      type="text"
+                      value={retailer.name}
+                      onChange={(e) => {
+                        const updated = [...networkRetailers];
+                        updated[idx] = { ...updated[idx], name: e.target.value };
+                        setNetworkRetailers(updated);
+                      }}
+                      className="font-bold text-gray-900 bg-transparent border-none outline-none"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <label className="text-gray-600 text-xs">Customers (M)</label>
+                      <input
+                        type="number"
+                        value={retailer.totalCustomers / 1000000}
+                        onChange={(e) => {
+                          const updated = [...networkRetailers];
+                          updated[idx] = { ...updated[idx], totalCustomers: parseFloat(e.target.value) * 1000000 };
+                          setNetworkRetailers(updated);
+                        }}
+                        className="w-full px-2 py-1 border rounded text-sm"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-gray-600 text-xs">Adoption Rate (%)</label>
+                      <input
+                        type="number"
+                        value={(retailer.dwalletAdoption * retailer.activeConsent * 100).toFixed(0)}
+                        onChange={(e) => {
+                          const updated = [...networkRetailers];
+                          const newRate = parseFloat(e.target.value) / 100;
+                          updated[idx] = { ...updated[idx], dwalletAdoption: newRate / retailer.activeConsent };
+                          setNetworkRetailers(updated);
+                        }}
+                        className="w-full px-2 py-1 border rounded text-sm"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-gray-600 text-xs">Transactions/Year</label>
+                      <input
+                        type="number"
+                        value={retailer.annualTransactions}
+                        onChange={(e) => {
+                          const updated = [...networkRetailers];
+                          updated[idx] = { ...updated[idx], annualTransactions: parseInt(e.target.value) };
+                          setNetworkRetailers(updated);
+                        }}
+                        className="w-full px-2 py-1 border rounded text-sm"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-gray-600 text-xs">Launch Month</label>
+                      <input
+                        type="number"
+                        value={retailer.launchMonth}
+                        onChange={(e) => {
+                          const updated = [...networkRetailers];
+                          updated[idx] = { ...updated[idx], launchMonth: parseInt(e.target.value) };
+                          setNetworkRetailers(updated);
+                        }}
+                        className="w-full px-2 py-1 border rounded text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-4 text-sm text-gray-600 bg-blue-50 p-3 rounded">
+              <strong>Note:</strong> Adjust retailer parameters to model different network scenarios. Launch months show phased rollout (0 = immediate, 12 = year 2, etc.)
+            </div>
+          </div>
+        )}
+
+        {/* Aggregate Network Metrics */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="scorecard">
+            <div className="scorecard-label">TOTAL NETWORK REVENUE</div>
+            <div className="scorecard-value">{formatCurrency(totalNetworkRevenue)}</div>
+            <div className="scorecard-subtitle">All Retailers, 36 Months</div>
+          </div>
+
+          <div className="scorecard">
+            <div className="scorecard-label">WALMART SHARE</div>
+            <div className="scorecard-value">
+              {((retailerTotals.find(r => r.id === 'walmart')?.totalRevenue / totalNetworkRevenue) * 100).toFixed(1)}%
+            </div>
+            <div className="scorecard-subtitle">
+              {formatCurrency(retailerTotals.find(r => r.id === 'walmart')?.totalRevenue || 0)}
+            </div>
+          </div>
+
+          <div className="scorecard">
+            <div className="scorecard-label">CONSUMER EARNINGS</div>
+            <div className="scorecard-value">{formatCurrency(totalConsumerEarnings)}</div>
+            <div className="scorecard-subtitle">Network-wide, 36 Months</div>
+          </div>
+
+          <div className="scorecard">
+            <div className="scorecard-label">TOTAL CERT POOL</div>
+            <div className="scorecard-value">{(totalCertPool / 1000000000).toFixed(1)}B</div>
+            <div className="scorecard-subtitle">Month 36 Aggregate</div>
+          </div>
+        </div>
+
+        {/* Certificate Volume Growth Chart */}
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Certificate Pool Growth (Millions)</h3>
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis type="number" label={{ value: 'Revenue ($B)', position: 'insideBottom', offset: -5 }} />
-              <YAxis type="category" dataKey="retailers" width={100} />
+              <XAxis 
+                dataKey="month" 
+                label={{ value: 'Month', position: 'insideBottom', offset: -5 }}
+              />
+              <YAxis 
+                label={{ value: 'Active Certificates (M)', angle: -90, position: 'insideLeft' }}
+              />
               <Tooltip 
-                formatter={(value) => `$${value.toFixed(1)}B`}
+                formatter={(value, name) => {
+                  if (name === 'networkMultiplier') return [`${value.toFixed(2)}×`, 'Network Multiplier'];
+                  return [`${value.toFixed(1)}M certs`, name];
+                }}
                 contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc' }}
               />
               <Legend />
-              <Bar dataKey="minting" stackId="a" fill="#059669" name="Minting Revenue" />
-              <Bar dataKey="licensing" stackId="a" fill="#10B981" name="Licensing Revenue" />
-            </BarChart>
+              {networkRetailers.map(retailer => (
+                <Line
+                  key={retailer.id}
+                  type="monotone"
+                  dataKey={retailer.name}
+                  stroke={retailerColors[retailer.name] || '#666'}
+                  strokeWidth={2}
+                  dot={false}
+                  name={retailer.name}
+                />
+              ))}
+            </LineChart>
           </ResponsiveContainer>
-          <div className="mt-4 text-sm text-gray-600 bg-blue-50 p-3 rounded">
-            <strong>How to use:</strong> Toggle "Show Network Effects" in Executive Summary to see how these scenarios 
-            impact Walmart's revenue. This view shows the full comparison across all network sizes.
+          <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-600">
+            <p className="text-sm text-gray-700">
+              <strong>Phased Rollout:</strong> Retailers join over time. Notice how the certificate pool accelerates 
+              as each retailer launches. The network multiplier (Metcalfe's Law) increases license fees as the 
+              aggregate pool grows.
+            </p>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Current Multipliers {showNetworkEffects ? `(${displaySize} Retailers)` : '(Standalone)'}
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <div className="text-sm font-semibold text-gray-600">Price Premium</div>
-                <div className="text-xl font-bold text-gray-900">
-                  {pricePremium.toFixed(2)}× {displaySize > 1 && `(+${((pricePremium - 1) * 100).toFixed(0)}%)`}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">Brands pay more for multi-retailer data</div>
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-gray-600">Reuse Rate</div>
-                <div className="text-xl font-bold text-gray-900">
-                  {(4 * reuseMultiplier).toFixed(1)}× per year {displaySize > 1 && `(+${((reuseMultiplier - 1) * 100).toFixed(0)}%)`}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">More remarketing touchpoints</div>
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-gray-600">Adoption Rate</div>
-                <div className="text-xl font-bold text-gray-900">
-                  {formatPercent(currentAdoption)} {displaySize > 1 && `(+${((currentAdoption / effectiveOptIn - 1) * 100).toFixed(0)}%)`}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">Network credibility effect</div>
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-gray-600">Certificate Pool</div>
-                <div className="text-xl font-bold text-gray-900">
-                  {formatNumber(month36.activeCertPool * (currentAdoption / effectiveOptIn))}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">Your certificates only (adoption lift)</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Why This Matters</h3>
-            <div className="space-y-3 text-sm text-gray-700">
-              <p>
-                <strong>YOUR certificates become more valuable.</strong> When brands can build cross-retailer 
-                shopper profiles, they pay premiums for access to YOUR data—not Target's or Kroger's.
-              </p>
-              <p>
-                <strong>More remarketing opportunities.</strong> Brands can now reach your shoppers across 
-                multiple retail touchpoints, increasing how often they license YOUR certificates.
-              </p>
-              <p>
-                <strong>Faster adoption.</strong> Consumers opt in faster when they see Walmart + Target + Kroger 
-                all participating. Network credibility drives more of YOUR shoppers to activate dWallets.
-              </p>
-            </div>
+        {/* Retailer Economics Table */}
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Individual Retailer Economics (36 Months)</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className="text-left px-4 py-3">Retailer</th>
+                  <th className="text-right px-4 py-3">Customers</th>
+                  <th className="text-right px-4 py-3">Adoption</th>
+                  <th className="text-right px-4 py-3">Launch Mo.</th>
+                  <th className="text-right px-4 py-3">Total Revenue</th>
+                  <th className="text-right px-4 py-3">Consumer Earnings</th>
+                  <th className="text-right px-4 py-3">Final Cert Pool</th>
+                </tr>
+              </thead>
+              <tbody>
+                {retailerTotals.map(retailer => (
+                  <tr key={retailer.id}>
+                    <td className="px-4 py-3 font-semibold text-gray-900">{retailer.name}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">
+                      {(retailer.totalCustomers / 1000000).toFixed(0)}M
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-700">
+                      {formatPercent(retailer.dwalletAdoption * retailer.activeConsent)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-700">
+                      {retailer.launchMonth}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                      {formatCurrency(retailer.totalRevenue)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-700">
+                      {formatCurrency(retailer.totalConsumer)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-700">
+                      {(retailer.finalCertPool / 1000000).toFixed(0)}M
+                    </td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-gray-300 font-bold bg-gray-50">
+                  <td className="px-4 py-3">NETWORK TOTAL</td>
+                  <td className="px-4 py-3 text-right">
+                    {(networkRetailers.reduce((sum, r) => sum + r.totalCustomers, 0) / 1000000).toFixed(0)}M
+                  </td>
+                  <td className="px-4 py-3"></td>
+                  <td className="px-4 py-3"></td>
+                  <td className="px-4 py-3 text-right text-green-700">
+                    {formatCurrency(totalNetworkRevenue)}
+                  </td>
+                  <td className="px-4 py-3 text-right text-blue-700">
+                    {formatCurrency(totalConsumerEarnings)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {(totalCertPool / 1000000).toFixed(0)}M
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div className="bg-green-50 rounded-lg p-6 border-l-4 border-green-600">
-          <div className="flex items-start gap-3">
-            <div className="text-2xl">💡</div>
-            <div>
-              <div className="font-semibold text-lg text-gray-900 mb-1">STRATEGIC INSIGHT</div>
-              <p className="text-gray-700">
-                Network effects drive 1.7× to 3.8× revenue growth through three mechanisms: brands pay premiums 
-                for cross-retailer insights (+12-48%), reuse YOUR certificates more frequently (+40-100%), and 
-                consumers adopt faster due to network credibility (+4-16pp). This is value creation through 
-                YOUR certificates becoming more valuable—not revenue redistribution from competitors.
-              </p>
-            </div>
-          </div>
+        {/* Key Insight */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-8 border-l-4 border-green-600 shadow-lg">
+          <div className="font-bold text-xl text-gray-900 mb-4">NETWORK VALUE CREATION</div>
+          <p className="text-gray-700 text-lg leading-relaxed mb-3">
+            With {networkRetailers.length} retailers in the network, the aggregate certificate pool reaches{' '}
+            <strong>{(totalCertPool / 1000000000).toFixed(1)}B certificates</strong> by month 36. Metcalfe's Law 
+            drives a <strong>{networkMonth36.networkMultiplier.toFixed(2)}× multiplier</strong> on license fees 
+            as brands gain access to cross-retailer shopper insights.
+          </p>
+          <p className="text-gray-600 text-base">
+            <strong>Why it works:</strong> Each retailer generates certificates from their own customer base. 
+            The aggregate pool size increases brand willingness to pay (network value = k × n²). Walmart earns{' '}
+            <strong>{formatCurrency(retailerTotals.find(r => r.id === 'walmart')?.totalRevenue || 0)}</strong> from 
+            their own certificates—which become more valuable in a larger network.
+          </p>
         </div>
       </div>
     );
