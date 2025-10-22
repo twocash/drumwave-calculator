@@ -308,76 +308,159 @@ export default function DrumWaveWalmartTool() {
     
     return (
       <div className="space-y-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Walmart x Drumwave: Economic Model</h1>
-          <p className="text-lg text-gray-600">Shopper Data Marketplace 36-Month Projection</p>
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-3" style={{ letterSpacing: '-0.02em' }}>
+            Walmart x DrumWave: Economic Model
+          </h1>
+          <p className="text-xl text-gray-600 font-semibold">Shopper Data Marketplace 36-Month Projection</p>
         </div>
 
-        <div className="flex justify-center gap-4">
-          {['Low', 'Base', 'High'].map((preset) => (
-            <button
-              key={preset}
-              onClick={() => handlePresetClick(preset)}
-              className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-                scenario === preset && !customMode
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-blue-400'
-              }`}
-            >
-              {preset}
-            </button>
-          ))}
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4 flex items-center justify-center gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showNetworkEffects}
-              onChange={(e) => {
-                setShowNetworkEffects(e.target.checked);
-                if (!e.target.checked) setNetworkSize(1);
-              }}
-              className="w-5 h-5 text-blue-600 rounded"
-            />
-            <span className="font-semibold text-gray-700">Show Network Effects</span>
-          </label>
+        {/* Scenario Selection - Prominent Control Panel */}
+        <div className="control-panel">
+          <div className="text-center mb-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Select Model Scenario</h2>
+            <p className="text-sm text-gray-600">Choose market conditions to model skeptical, realistic, or enthusiastic adoption</p>
+          </div>
           
-          {showNetworkEffects && (
-            <div className="flex gap-2 ml-4 pl-4 border-l-2 border-gray-300">
-              {[2, 3, 5].map((size) => (
-                <button
-                  key={size}
-                  onClick={() => setNetworkSize(size)}
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                    networkSize === size
-                      ? 'bg-green-600 text-white shadow-lg'
-                      : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-green-400'
-                  }`}
-                >
-                  {size} Retailers
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex justify-center gap-4 mb-6">
+            {['Low', 'Base', 'High'].map((preset) => (
+              <button
+                key={preset}
+                onClick={() => handlePresetClick(preset)}
+                className={`scenario-button ${
+                  scenario === preset && !customMode ? 'active' : 'inactive'
+                }`}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+
+          {/* Network Effects Toggle */}
+          <div className="network-toggle-container">
+            <label className="network-toggle-label">
+              <input
+                type="checkbox"
+                checked={showNetworkEffects}
+                onChange={(e) => {
+                  setShowNetworkEffects(e.target.checked);
+                  if (!e.target.checked) setNetworkSize(1);
+                }}
+                className="network-toggle-checkbox"
+              />
+              <span>Show Network Effects</span>
+            </label>
+            
+            {showNetworkEffects && (
+              <div className="flex gap-3 ml-6 pl-6 border-l-2 border-gray-300">
+                {[2, 3, 5].map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setNetworkSize(size)}
+                    className={`network-size-button ${
+                      networkSize === size ? 'active' : 'inactive'
+                    }`}
+                  >
+                    {size} Retailers
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-4 gap-6">
-          <div className="bg-white rounded-lg shadow-lg p-6 border-t-4 border-green-500">
-            <div className="text-sm font-semibold text-gray-600 mb-2">WALMART REVENUE</div>
-            <div className="text-4xl font-bold text-gray-900 mb-1">{formatCurrency(displayCumulativeRetailer)}</div>
-            <div className="text-sm text-gray-500">36-Month Total</div>
+        {/* Scorecards Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="scorecard">
+            <div className="scorecard-label">WALMART REVENUE</div>
+            <div className="scorecard-value">{formatCurrency(displayCumulativeRetailer)}</div>
+            <div className="scorecard-subtitle">36-Month Total</div>
             {showNetworkEffects && (
-              <div className="text-xs text-green-600 font-semibold mt-2">
+              <div className="scorecard-badge">
                 {(displayCumulativeRetailer / cumulativeRetailer).toFixed(1)}× baseline
               </div>
             )}
           </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6 border-t-4 border-blue-500">
-            <div className="text-sm font-semibold text-gray-600 mb-2">EBIT PER CUSTOMER</div>
-            <div className="text-4xl font-bold text-gray-900 mb-1">
+          <div className="scorecard">
+            <div className="scorecard-label">EBIT PER CUSTOMER</div>
+            <div className="scorecard-value">
               ${((displayCumulativeRetailer * assumptions.royaltyMargin) / (assumptions.totalCustomers * effectiveOptIn * (showNetworkEffects ? (calculateAdoptionLift(networkSize, effectiveOptIn) / effectiveOptIn) : 1))).toFixed(2)}
+            </div>
+            <div className="scorecard-subtitle">Per Opted-In Customer</div>
+          </div>
+
+          <div className="scorecard">
+            <div className="scorecard-label">CONSUMER EARNINGS</div>
+            <div className="scorecard-value">{formatCurrency(displayCumulativeConsumer)}</div>
+            <div className="scorecard-subtitle">36-Month Total</div>
+            {showNetworkEffects && (
+              <div className="scorecard-badge">
+                {(displayCumulativeConsumer / cumulativeConsumer).toFixed(1)}× baseline
+              </div>
+            )}
+          </div>
+
+          <div className="scorecard">
+            <div className="scorecard-label">ACTIVE CERT POOL</div>
+            <div className="scorecard-value">{(displayActiveCerts / 1000000000).toFixed(2)}B</div>
+            <div className="scorecard-subtitle">Month 36</div>
+            {showNetworkEffects && (
+              <div className="scorecard-badge">
+                {(displayActiveCerts / month36.activeCertPool).toFixed(1)}× baseline
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Key Insight Box */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-8 border-l-4 border-blue-600 shadow-lg">
+          <div className="font-bold text-xl text-gray-900 mb-4">KEY INSIGHT</div>
+          {!showNetworkEffects ? (
+            <>
+              <p className="text-gray-700 text-lg leading-relaxed mb-3">
+                At {formatPercent(effectiveOptIn)} adoption, Walmart generates {formatCurrency(cumulativeRetailer)} in new 
+                revenue over 3 years from existing transactions—no change to shopper experience. Consumers earn {formatCurrency(cumulativeConsumer)}, 
+                creating a virtuous cycle of adoption and value.
+              </p>
+              <p className="text-gray-600 text-base">
+                <strong>Note:</strong> Scenarios vary across 7 dimensions (adoption, transactions, license pricing, reuse rates, and more) 
+                to model skeptical/realistic/enthusiastic market conditions.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-700 text-lg leading-relaxed mb-3">
+                With {networkSize} retailers in the network, YOUR certificates become {(displayCumulativeRetailer / cumulativeRetailer).toFixed(1)}× more valuable. 
+                Brands pay premiums for cross-retailer insights and reuse YOUR certificates more frequently. Walmart's revenue 
+                reaches {formatCurrency(displayCumulativeRetailer)} while consumers earn {formatCurrency(displayCumulativeConsumer)}.
+              </p>
+              <p className="text-gray-600 text-base">
+                <strong>Network Effect:</strong> This is value creation (higher prices, more reuses), not redistribution. 
+                You earn on YOUR certificates only—they just become more valuable in a larger network.
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row justify-center gap-6 pt-4">
+          <button
+            onClick={() => setActiveView('standalone')}
+            className="action-button action-button-primary"
+          >
+            Explore Standalone Model →
+          </button>
+          <button
+            onClick={() => setActiveView('network')}
+            className="action-button action-button-secondary"
+          >
+            See Network Effects →
+          </button>
+        </div>
+      </div>
+    );
+  };
             </div>
             <div className="text-sm text-gray-500">Per Opted-In Customer</div>
           </div>
