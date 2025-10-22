@@ -302,8 +302,8 @@ function calculateMetcalfeValue(numActiveRetailers, maxRetailers = 10, baseCoeff
   return 1 + networkEffect;
 }
 
-// Calculate retailer results with network awareness
-function calculateRetailerResults(retailer, month, mintingFee, licenseFee, usesPerCertPerYear, networkMultiplier = 1.0) {
+// Calculate retailer results with network awareness - V2 with proper rolling window
+function calculateRetailerResultsV2(retailer, month, mintingHistory, mintingFee, licenseFee, usesPerCertPerYear, networkMultiplier = 1.0) {
   // Only calculate if retailer has launched
   if (month < retailer.launchMonth) {
     return {
@@ -311,7 +311,10 @@ function calculateRetailerResults(retailer, month, mintingFee, licenseFee, usesP
       activeCertPool: 0,
       mintingRevenue: 0,
       licensingRevenue: 0,
-      consumerEarnings: 0
+      totalRevenue: 0,
+      consumerEarnings: 0,
+      brandParticipation: 0,
+      effectiveOptIn: 0
     };
   }
   
@@ -334,11 +337,13 @@ function calculateRetailerResults(retailer, month, mintingFee, licenseFee, usesP
   // Transaction volume
   const totalMonthlyTransactions = optedInCustomers * monthlyTransactionsPerCustomer;
   
-  // Certificate minting
+  // Certificate minting THIS MONTH
   const certsMintedThisMonth = totalMonthlyTransactions * avgEligibleItems * brandParticipation;
   
-  // Simplified pool calculation (for network aggregation, we'll use rolling window elsewhere)
-  const activeCertPool = certsMintedThisMonth * Math.min(12, monthsSinceLaunch + 1);
+  // PROPER 12-month rolling window certificate pool
+  // Calculate pool from history + current month, minus expired (month-13)
+  const expiredCerts = mintingHistory.length > 12 ? mintingHistory[mintingHistory.length - 13] : 0;
+  const activeCertPool = mintingHistory.reduce((sum, val) => sum + (val || 0), 0) + certsMintedThisMonth - expiredCerts;
   
   // Minting revenue (no network effect on minting)
   const totalMintingRevenue = certsMintedThisMonth * mintingFee;
@@ -364,9 +369,15 @@ function calculateRetailerResults(retailer, month, mintingFee, licenseFee, usesP
   };
 }
 
-// Calculate full network results across all retailers
+// Calculate full network results across all retailers with proper history tracking
 function calculateNetworkResults(retailers, mintingFee, licenseFee, usesPerCertPerYear, metcalfeCoefficient = 0.5) {
   const monthlyResults = [];
+  
+  // Create minting history tracker for each retailer
+  const retailerHistories = retailers.map(r => ({
+    id: r.id,
+    mintingHistory: []
+  }));
   
   for (let month = 0; month < 36; month++) {
     // Determine how many retailers are active this month
@@ -376,17 +387,36 @@ function calculateNetworkResults(retailers, mintingFee, licenseFee, usesPerCertP
     const networkMultiplier = calculateMetcalfeValue(activeRetailers, 10, metcalfeCoefficient);
     
     // Calculate results for each retailer
-    const retailerMonthResults = retailers.map(retailer => ({
-      retailerId: retailer.id,
-      retailerName: retailer.name,
-      ...calculateRetailerResults(retailer, month, mintingFee, licenseFee, usesPerCertPerYear, networkMultiplier)
-    }));
+    const retailerMonthResults = retailers.map((retailer, idx) => {
+      // Get this retailer's minting history
+      const history = retailerHistories[idx];
+      
+      // Calculate for this month using proper rolling window
+      const result = calculateRetailerResultsV2(
+        retailer, 
+        month, 
+        history.mintingHistory,
+        mintingFee, 
+        licenseFee, 
+        usesPerCertPerYear, 
+        networkMultiplier
+      );
+      
+      // Update history with this month's minting
+      history.mintingHistory.push(result.certsMinted);
+      
+      return {
+        retailerId: retailer.id,
+        retailerName: retailer.name,
+        ...result
+      };
+    });
     
-    // Aggregate totals
-    const aggregateCerts = retailerMonthResults.reduce((sum, r) => sum + r.certsMinted, 0);
-    const aggregatePool = retailerMonthResults.reduce((sum, r) => sum + r.activeCertPool, 0);
-    const aggregateRetailerRevenue = retailerMonthResults.reduce((sum, r) => sum + r.totalRevenue, 0);
-    const aggregateConsumerEarnings = retailerMonthResults.reduce((sum, r) => sum + r.consumerEarnings, 0);
+    // Aggregate totals with NaN guards
+    const aggregateCerts = retailerMonthResults.reduce((sum, r) => sum + (r.certsMinted || 0), 0);
+    const aggregatePool = retailerMonthResults.reduce((sum, r) => sum + (r.activeCertPool || 0), 0);
+    const aggregateRetailerRevenue = retailerMonthResults.reduce((sum, r) => sum + (r.totalRevenue || 0), 0);
+    const aggregateConsumerEarnings = retailerMonthResults.reduce((sum, r) => sum + (r.consumerEarnings || 0), 0);
     
     monthlyResults.push({
       month: month + 1,
@@ -501,16 +531,31 @@ export default function DrumWaveWalmartTool() {
 
   const DashboardView = () => {
     // Calculate metrics based on whether network effects are shown
-    const displayResults = showNetworkEffects ? networkResults : singleRetailerResults;
-    const displayCumulativeRetailer = showNetworkEffects 
-      ? displayResults.reduce((sum, r) => sum + r.retailerTotal, 0)
-      : cumulativeRetailer;
-    const displayCumulativeConsumer = showNetworkEffects
-      ? displayResults.reduce((sum, r) => sum + r.consumerTotal, 0)
-      : cumulativeConsumer;
-    const displayActiveCerts = showNetworkEffects
-      ? displayResults[35].activeCertPool
-      : month36.activeCertPool;
+    // When network effects are on, use fullNetworkResults (real retailer volumes with Metcalfe's Law)
+    // Otherwise use standalone Walmart model
+    const displayResults = showNetworkEffects ? null : singleRetailerResults; // Keep for backwards compatibility
+    
+    let displayCumulativeRetailer, displayCumulativeConsumer, displayActiveCerts, networkMultiplier;
+    
+    if (showNetworkEffects) {
+      // Extract Walmart's data from fullNetworkResults
+      const walmartData = fullNetworkResults
+        .map(month => month.retailers.find(r => r.retailerId === 'walmart'))
+        .filter(r => r);
+      
+      // Calculate cumulative values
+      displayCumulativeRetailer = walmartData.reduce((sum, r) => sum + (r.totalRevenue || 0), 0);
+      displayCumulativeConsumer = walmartData.reduce((sum, r) => sum + (r.consumerEarnings || 0), 0);
+      displayActiveCerts = walmartData[walmartData.length - 1]?.activeCertPool || 0;
+      
+      // Get network multiplier from month 36 (when all retailers are active)
+      networkMultiplier = fullNetworkResults[fullNetworkResults.length - 1]?.networkMultiplier || 1.0;
+    } else {
+      displayCumulativeRetailer = cumulativeRetailer;
+      displayCumulativeConsumer = cumulativeConsumer;
+      displayActiveCerts = month36.activeCertPool;
+      networkMultiplier = 1.0;
+    }
     
     return (
       <div className="space-y-8">
@@ -550,28 +595,11 @@ export default function DrumWaveWalmartTool() {
                 checked={showNetworkEffects}
                 onChange={(e) => {
                   setShowNetworkEffects(e.target.checked);
-                  if (!e.target.checked) setNetworkSize(1);
                 }}
                 className="network-toggle-checkbox"
               />
               <span>Show Network Effects</span>
             </label>
-            
-            {showNetworkEffects && (
-              <div className="flex gap-3 ml-6 pl-6 border-l-2 border-gray-300">
-                {[2, 3, 5].map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setNetworkSize(size)}
-                    className={`network-size-button ${
-                      networkSize === size ? 'active' : 'inactive'
-                    }`}
-                  >
-                    {size} Retailers
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 
@@ -591,7 +619,7 @@ export default function DrumWaveWalmartTool() {
           <div className="scorecard">
             <div className="scorecard-label">EBIT PER CUSTOMER</div>
             <div className="scorecard-value">
-              ${((displayCumulativeRetailer * assumptions.royaltyMargin) / (assumptions.totalCustomers * effectiveOptIn * (showNetworkEffects ? (calculateAdoptionLift(networkSize, effectiveOptIn) / effectiveOptIn) : 1))).toFixed(2)}
+              ${((displayCumulativeRetailer * assumptions.royaltyMargin) / (assumptions.totalCustomers * effectiveOptIn)).toFixed(2)}
             </div>
             <div className="scorecard-subtitle">Per Opted-In Customer</div>
           </div>
@@ -637,13 +665,13 @@ export default function DrumWaveWalmartTool() {
           ) : (
             <>
               <p className="text-gray-700 text-lg leading-relaxed mb-3">
-                With {networkSize} retailers in the network, YOUR certificates become {(displayCumulativeRetailer / cumulativeRetailer).toFixed(1)}× more valuable. 
-                Brands pay premiums for cross-retailer insights and reuse YOUR certificates more frequently. Walmart's revenue 
+                With 5 retailers in the network, Walmart's certificates become {networkMultiplier.toFixed(2)}× more valuable due to Metcalfe's Law. 
+                Brands pay a {((networkMultiplier - 1) * 100).toFixed(0)}% premium for cross-retailer insights. Walmart's revenue 
                 reaches {formatCurrency(displayCumulativeRetailer)} while consumers earn {formatCurrency(displayCumulativeConsumer)}.
               </p>
               <p className="text-gray-600 text-base">
-                <strong>Network Effect:</strong> This is value creation (higher prices, more reuses), not redistribution. 
-                You earn on YOUR certificates only—they just become more valuable in a larger network.
+                <strong>Network Effect:</strong> This is value creation (higher prices per license), not redistribution. 
+                Walmart earns on their own certificates—they just become more valuable in a larger network.
               </p>
             </>
           )}
@@ -917,21 +945,22 @@ export default function DrumWaveWalmartTool() {
       'Costco': '#0066B2'
     };
     
-    // Calculate 36-month totals by retailer
+    // Calculate 36-month totals by retailer with NaN guards
     const retailerTotals = networkRetailers.map(retailer => {
       const retailerResults = fullNetworkResults
         .map(m => m.retailers.find(r => r.retailerId === retailer.id))
         .filter(r => r);
       
-      const total36MonthRevenue = retailerResults.reduce((sum, r) => sum + r.totalRevenue, 0);
-      const total36MonthConsumer = retailerResults.reduce((sum, r) => sum + r.consumerEarnings, 0);
+      // Use NaN guards to ensure clean aggregation
+      const total36MonthRevenue = retailerResults.reduce((sum, r) => sum + (r.totalRevenue || 0), 0);
+      const total36MonthConsumer = retailerResults.reduce((sum, r) => sum + (r.consumerEarnings || 0), 0);
       const month36Certs = retailerResults[retailerResults.length - 1]?.activeCertPool || 0;
       
       return {
         ...retailer,
-        totalRevenue: total36MonthRevenue,
-        totalConsumer: total36MonthConsumer,
-        finalCertPool: month36Certs
+        totalRevenue: isNaN(total36MonthRevenue) ? 0 : total36MonthRevenue,
+        totalConsumer: isNaN(total36MonthConsumer) ? 0 : total36MonthConsumer,
+        finalCertPool: isNaN(month36Certs) ? 0 : month36Certs
       };
     });
     
@@ -1234,6 +1263,201 @@ export default function DrumWaveWalmartTool() {
     );
   };
 
+  const MonthlyView = () => {
+    const [viewMode, setViewMode] = useState('standalone'); // 'standalone' or 'network'
+    
+    // Determine which data to show
+    const monthlyData = viewMode === 'standalone' 
+      ? singleRetailerResults 
+      : fullNetworkResults.map(month => {
+          // For network view, show aggregates
+          return {
+            month: month.month,
+            certsMintedThisMonth: month.aggregateCertsMinted,
+            activeCertPool: month.aggregateActiveCertPool,
+            retailerTotal: month.aggregateRetailerRevenue,
+            consumerTotal: month.aggregateConsumerEarnings,
+            networkMultiplier: month.networkMultiplier,
+            // Calculate cumulative values
+            cumulativeRetailerRev: fullNetworkResults
+              .slice(0, month.month)
+              .reduce((sum, m) => sum + m.aggregateRetailerRevenue, 0),
+            cumulativeConsumerRev: fullNetworkResults
+              .slice(0, month.month)
+              .reduce((sum, m) => sum + m.aggregateConsumerEarnings, 0)
+          };
+        });
+    
+    // Define metrics to display
+    const metrics = [
+      { 
+        key: 'certsMintedThisMonth', 
+        label: 'Certificates Minted', 
+        format: (v) => `${(v / 1000000).toFixed(2)}M`,
+        source: 'direct'
+      },
+      { 
+        key: 'activeCertPool', 
+        label: 'Active Certificate Pool', 
+        format: (v) => `${(v / 1000000).toFixed(1)}M`,
+        source: 'direct'
+      },
+      { 
+        key: 'retailerTotal', 
+        label: viewMode === 'standalone' ? 'Walmart Revenue' : 'Total Network Revenue', 
+        format: (v) => formatCurrency(v),
+        source: 'direct'
+      },
+      { 
+        key: 'consumerTotal', 
+        label: 'Consumer Earnings', 
+        format: (v) => formatCurrency(v),
+        source: 'direct'
+      },
+      { 
+        key: 'cumulativeRetailerRev', 
+        label: viewMode === 'standalone' ? 'Cumulative Walmart Revenue' : 'Cumulative Network Revenue', 
+        format: (v) => formatCurrency(v),
+        source: 'direct'
+      },
+      { 
+        key: 'cumulativeConsumerRev', 
+        label: 'Cumulative Consumer Earnings', 
+        format: (v) => formatCurrency(v),
+        source: 'direct'
+      }
+    ];
+    
+    // Add network multiplier for network view
+    if (viewMode === 'network') {
+      metrics.splice(2, 0, {
+        key: 'networkMultiplier',
+        label: 'Network Multiplier (Metcalfe)',
+        format: (v) => `${v.toFixed(3)}×`,
+        source: 'direct'
+      });
+    }
+    
+    // CSV Export function
+    const exportToCSV = () => {
+      const rows = [];
+      
+      // Header row
+      const headers = ['Metric', ...Array.from({length: 36}, (_, i) => `Month ${i + 1}`)];
+      rows.push(headers.join(','));
+      
+      // Data rows
+      metrics.forEach(metric => {
+        const row = [
+          `"${metric.label}"`,
+          ...monthlyData.map(month => {
+            const value = month[metric.key];
+            // Remove currency symbols and commas for Excel compatibility
+            return metric.format(value || 0).replace(/[$,]/g, '');
+          })
+        ];
+        rows.push(row.join(','));
+      });
+      
+      // Create blob and download
+      const csv = rows.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `drumwave-monthly-${viewMode}-${scenario}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    };
+    
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Monthly Detail View</h2>
+          <p className="text-gray-600">Complete 36-month breakdown of all key metrics</p>
+        </div>
+
+        {/* Controls */}
+        <div className="flex justify-between items-center bg-white rounded-lg shadow p-4">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setViewMode('standalone')}
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                viewMode === 'standalone'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Walmart Standalone
+            </button>
+            <button
+              onClick={() => setViewMode('network')}
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                viewMode === 'network'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Network Aggregates
+            </button>
+          </div>
+          
+          <button
+            onClick={exportToCSV}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center gap-2"
+          >
+            <span>⬇</span> Export CSV
+          </button>
+        </div>
+
+        {/* Scrollable Table */}
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          <div className="overflow-x-auto" style={{ maxHeight: '600px' }}>
+            <table className="w-full border-collapse">
+              <thead className="bg-gray-100 sticky top-0 z-10">
+                <tr>
+                  <th className="px-4 py-3 text-left font-bold text-gray-900 border-r-2 border-gray-300 bg-gray-100 sticky left-0 z-20" style={{ minWidth: '250px' }}>
+                    Metric
+                  </th>
+                  {Array.from({length: 36}, (_, i) => i + 1).map(month => (
+                    <th key={month} className="px-3 py-3 text-center font-semibold text-gray-700 whitespace-nowrap" style={{ minWidth: '100px' }}>
+                      Mo {month}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {metrics.map((metric, idx) => (
+                  <tr 
+                    key={metric.key} 
+                    className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
+                  >
+                    <td className="px-4 py-3 font-semibold text-gray-900 border-r-2 border-gray-300 bg-inherit sticky left-0 z-10" style={{ minWidth: '250px' }}>
+                      {metric.label}
+                    </td>
+                    {monthlyData.map(month => (
+                      <td key={month.month} className="px-3 py-3 text-right text-sm text-gray-700 whitespace-nowrap">
+                        {metric.format(month[metric.key] || 0)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Info Box */}
+        <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-600">
+          <p className="text-sm text-gray-700">
+            <strong>How to use:</strong> Scroll horizontally to view all 36 months. The metric column stays fixed on the left. 
+            Toggle between Walmart Standalone and Network Aggregates to compare scenarios. Export to CSV for deeper analysis in Excel or Google Sheets.
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   const DetailsView = () => (
     <div className="space-y-6">
       <div>
@@ -1425,6 +1649,7 @@ export default function DrumWaveWalmartTool() {
               { id: 'dashboard', label: 'Executive Summary' },
               { id: 'standalone', label: 'Standalone Model' },
               { id: 'network', label: 'Network Effects' },
+              { id: 'monthly', label: 'Monthly Detail' },
               { id: 'details', label: 'Details' }
             ].map((view) => (
               <button
@@ -1446,6 +1671,7 @@ export default function DrumWaveWalmartTool() {
           {activeView === 'dashboard' && <DashboardView />}
           {activeView === 'standalone' && <StandaloneView />}
           {activeView === 'network' && <NetworkView />}
+          {activeView === 'monthly' && <MonthlyView />}
           {activeView === 'details' && <DetailsView />}
         </div>
       </div>
