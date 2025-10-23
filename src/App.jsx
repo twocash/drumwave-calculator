@@ -206,7 +206,7 @@ const PRESETS = {
     brandEndPct: 1.0,
     monthsToFull: 36,
     itemFloor: 3,
-    itemCeiling: 12,
+    itemCeiling: 10,
     mintingFee: 0.10,
     licenseFee: 0.200,
     usesPerCertPerYear: 6,
