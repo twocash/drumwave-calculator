@@ -557,29 +557,6 @@ export default function DrumWaveWalmartTool() {
     
     let displayCumulativeRetailer, displayCumulativeConsumer, displayActiveCerts, networkMultiplier;
     
-    // ============= DIAGNOSTIC LOGGING START =============
-    console.log('='.repeat(80));
-    console.log(`🔍 DIAGNOSTIC: DashboardView Render`);
-    console.log(`Current Scenario: ${scenario}`);
-    console.log(`Custom Mode: ${customMode}`);
-    console.log(`Network Effects: ${showNetworkEffects ? 'ON' : 'OFF'}`);
-    console.log('='.repeat(80));
-    
-    // Log scenario assumptions
-    console.log(`\n📊 Scenario Assumptions (${scenario}):`);
-    console.log(`  - DWallet Adoption: ${(assumptions.dwalletAdoption * 100).toFixed(1)}%`);
-    console.log(`  - Active Consent: ${(assumptions.activeConsent * 100).toFixed(1)}%`);
-    console.log(`  - Annual Transactions: ${assumptions.annualTransactions}`);
-    console.log(`  - License Fee: $${assumptions.licenseFee.toFixed(3)}`);
-    console.log(`  - Uses Per Cert: ${assumptions.usesPerCertPerYear}`);
-    console.log(`  - Effective Opt-In: ${(effectiveOptIn * 100).toFixed(1)}%`);
-    
-    // Log standalone values (these are the baseline comparisons)
-    console.log(`\n🏪 STANDALONE Values (${scenario} scenario baseline):`);
-    console.log(`  - Cumulative Retailer: ${formatCurrency(cumulativeRetailer)} = $${(cumulativeRetailer / 1000000000).toFixed(3)}B`);
-    console.log(`  - Cumulative Consumer: ${formatCurrency(cumulativeConsumer)} = $${(cumulativeConsumer / 1000000000).toFixed(3)}B`);
-    console.log(`  - Active Cert Pool (M36): ${(month36.activeCertPool / 1000000000).toFixed(2)}B certs`);
-    
     if (showNetworkEffects) {
       // Extract Walmart's data from fullNetworkResults
       const walmartData = fullNetworkResults
@@ -593,62 +570,12 @@ export default function DrumWaveWalmartTool() {
       
       // Get network multiplier from month 36 (when all retailers are active)
       networkMultiplier = fullNetworkResults[fullNetworkResults.length - 1]?.networkMultiplier || 1.0;
-      
-      // DIAGNOSTIC: Log network calculation details
-      console.log(`\n🌐 NETWORK Values (${scenario} scenario with network effects):`);
-      console.log(`  - Cumulative Retailer: ${formatCurrency(displayCumulativeRetailer)} = $${(displayCumulativeRetailer / 1000000000).toFixed(3)}B`);
-      console.log(`  - Cumulative Consumer: ${formatCurrency(displayCumulativeConsumer)} = $${(displayCumulativeConsumer / 1000000000).toFixed(3)}B`);
-      console.log(`  - Active Cert Pool (M36): ${(displayActiveCerts / 1000000000).toFixed(2)}B certs`);
-      console.log(`  - Network Multiplier (M36): ${networkMultiplier.toFixed(3)}x`);
-      
-      // DIAGNOSTIC: Check if scenarioAdjustedRetailers are being used
-      console.log(`\n🔧 Retailer Configuration Check:`);
-      const walmartRetailer = scenarioAdjustedRetailers.find(r => r.id === 'walmart');
-      console.log(`  - Walmart DWallet Adoption: ${(walmartRetailer.dwalletAdoption * 100).toFixed(1)}%`);
-      console.log(`  - Walmart Active Consent: ${(walmartRetailer.activeConsent * 100).toFixed(1)}%`);
-      console.log(`  - Walmart Annual Trans: ${walmartRetailer.annualTransactions}`);
-      console.log(`  - Walmart Item Floor: ${walmartRetailer.itemFloor}`);
-      console.log(`  - Walmart Item Ceiling: ${walmartRetailer.itemCeiling}`);
-      
-      // DIAGNOSTIC: Calculate what the multipliers will show
-      console.log(`\n🎯 MULTIPLIER CALCULATIONS (These are displayed in badges):`);
-      const revenueMultiplier = displayCumulativeRetailer / cumulativeRetailer;
-      const consumerMultiplier = displayCumulativeConsumer / cumulativeConsumer;
-      const certPoolMultiplier = displayActiveCerts / month36.activeCertPool;
-      
-      console.log(`  - Revenue Multiplier: ${displayCumulativeRetailer.toFixed(0)} / ${cumulativeRetailer.toFixed(0)} = ${revenueMultiplier.toFixed(2)}x`);
-      console.log(`  - Consumer Multiplier: ${displayCumulativeConsumer.toFixed(0)} / ${cumulativeConsumer.toFixed(0)} = ${consumerMultiplier.toFixed(2)}x`);
-      console.log(`  - Cert Pool Multiplier: ${displayActiveCerts.toFixed(0)} / ${month36.activeCertPool.toFixed(0)} = ${certPoolMultiplier.toFixed(2)}x`);
-      
-      console.log(`\n⚠️  DIAGNOSIS:`);
-      console.log(`  - The numerator (network) uses: ${scenario} scenario assumptions`);
-      console.log(`  - The denominator (standalone) uses: ${scenario} scenario assumptions`);
-      console.log(`  - We are comparing: "${scenario} Network" vs "${scenario} Standalone"`);
-      console.log(`  - This means the baseline CHANGES with each scenario!`);
-      
-      // Sample some monthly data to verify calculation
-      console.log(`\n📈 Sample Network Data (First 3 months):`);
-      fullNetworkResults.slice(0, 3).forEach(monthData => {
-        const walmartMonth = monthData.retailers.find(r => r.retailerId === 'walmart');
-        console.log(`  Month ${monthData.month}:`);
-        console.log(`    - Active Retailers: ${monthData.activeRetailers}`);
-        console.log(`    - Network Multiplier: ${monthData.networkMultiplier.toFixed(3)}x`);
-        console.log(`    - Walmart Certs Minted: ${(walmartMonth.certsMinted / 1000000).toFixed(2)}M`);
-        console.log(`    - Walmart Active Pool: ${(walmartMonth.activeCertPool / 1000000).toFixed(2)}M`);
-        console.log(`    - Walmart Revenue: ${formatCurrency(walmartMonth.totalRevenue)}`);
-      });
-      
     } else {
       displayCumulativeRetailer = cumulativeRetailer;
       displayCumulativeConsumer = cumulativeConsumer;
       displayActiveCerts = month36.activeCertPool;
       networkMultiplier = 1.0;
     }
-    
-    console.log('='.repeat(80));
-    console.log(`✅ End of Diagnostic Logging`);
-    console.log('='.repeat(80));
-    // ============= DIAGNOSTIC LOGGING END =============
     
     return (
       <div className="space-y-8">
