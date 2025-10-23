@@ -1502,7 +1502,10 @@ export default function DrumWaveWalmartTool() {
                     key={metric.key} 
                     className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
                   >
-                    <td className="px-4 py-3 font-semibold text-gray-900 border-r-2 border-gray-300 bg-inherit sticky left-0 z-10" style={{ minWidth: '250px' }}>
+                    <td 
+                      className="px-4 py-3 font-semibold text-gray-900 border-r-2 border-gray-300 sticky left-0 z-10 bg-white" 
+                      style={{ minWidth: '250px' }}
+                    >
                       {metric.label}
                     </td>
                     {monthlyData.map(month => (
