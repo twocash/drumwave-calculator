@@ -489,16 +489,36 @@ export default function DrumWaveWalmartTool() {
     [singleRetailerResults, networkSize, effectiveOptIn]
   );
   
+  // Apply scenario assumptions to Walmart retailer
+  // Other retailers keep their configured values
+  const scenarioAdjustedRetailers = useMemo(() => {
+    return networkRetailers.map(retailer => ({
+      ...retailer,
+      // Override with scenario-specific values (only for Walmart)
+      ...(retailer.id === 'walmart' ? {
+        totalCustomers: assumptions.totalCustomers,
+        dwalletAdoption: assumptions.dwalletAdoption,
+        activeConsent: assumptions.activeConsent,
+        annualTransactions: assumptions.annualTransactions,
+        brandStartPct: assumptions.brandStartPct,
+        brandEndPct: assumptions.brandEndPct,
+        monthsToFull: assumptions.monthsToFull,
+        itemFloor: assumptions.itemFloor,
+        itemCeiling: assumptions.itemCeiling
+      } : {})
+    }));
+  }, [networkRetailers, assumptions]);
+  
   // New: Full network results with actual retailer volumes
   const fullNetworkResults = useMemo(
     () => calculateNetworkResults(
-      networkRetailers, 
+      scenarioAdjustedRetailers, 
       assumptions.mintingFee, 
       assumptions.licenseFee, 
       assumptions.usesPerCertPerYear,
       metcalfeCoefficient
     ),
-    [networkRetailers, assumptions.mintingFee, assumptions.licenseFee, assumptions.usesPerCertPerYear, metcalfeCoefficient]
+    [scenarioAdjustedRetailers, assumptions.mintingFee, assumptions.licenseFee, assumptions.usesPerCertPerYear, metcalfeCoefficient]
   );
 
   const month36 = singleRetailerResults[35];
