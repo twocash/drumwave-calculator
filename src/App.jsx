@@ -598,8 +598,13 @@ export default function DrumWaveWalmartTool() {
                 }}
                 className="network-toggle-checkbox"
               />
-              <span>Show Network Effects</span>
+              <span>Show Network Effects (5 Retailers, Phased Rollout)</span>
             </label>
+            {showNetworkEffects && (
+              <div className="text-sm text-gray-600 mt-2 text-center">
+                Showing Walmart's revenue with full 5-retailer network effects (Metcalfe's Law)
+              </div>
+            )}
           </div>
         </div>
 
@@ -918,10 +923,8 @@ export default function DrumWaveWalmartTool() {
   };
 
   const NetworkView = () => {
-    // Get network month 36 aggregate data
+    // Get network month 36 data for cert pool
     const networkMonth36 = fullNetworkResults[35];
-    const totalNetworkRevenue = networkMonth36.aggregateRetailerRevenue;
-    const totalConsumerEarnings = networkMonth36.aggregateConsumerEarnings;
     const totalCertPool = networkMonth36.aggregateActiveCertPool;
     
     // Prepare chart data showing certificate volume by retailer over time
@@ -963,6 +966,10 @@ export default function DrumWaveWalmartTool() {
         finalCertPool: isNaN(month36Certs) ? 0 : month36Certs
       };
     });
+    
+    // NOW calculate aggregate 36-month totals from retailerTotals (not just month 36)
+    const totalNetworkRevenue = retailerTotals.reduce((sum, r) => sum + r.totalRevenue, 0);
+    const totalConsumerEarnings = retailerTotals.reduce((sum, r) => sum + r.totalConsumer, 0);
     
     return (
       <div className="space-y-8">
