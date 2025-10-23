@@ -549,6 +549,23 @@ export default function DrumWaveWalmartTool() {
 
   // ==================== VIEW COMPONENTS ====================
 
+  // Helper function for scenario-specific descriptions
+  const getScenarioDescription = (scenario, avgCertsPerTrip, assumptions) => {
+    const certs = avgCertsPerTrip.toFixed(1);
+    
+    switch(scenario) {
+      case 'Low':
+        return `Conservative adoption (${(assumptions.dwalletAdoption * 100).toFixed(0)}% DWallet, ${(assumptions.activeConsent * 100).toFixed(0)}% consent) with ${certs} certificates per trip from essential branded products.`;
+      
+      case 'High':
+        return `Enthusiastic adoption (${(assumptions.dwalletAdoption * 100).toFixed(0)}% DWallet, ${(assumptions.activeConsent * 100).toFixed(0)}% consent) with ${certs} certificates per trip from broad brand participation.`;
+      
+      case 'Base':
+      default:
+        return `Realistic adoption (${(assumptions.dwalletAdoption * 100).toFixed(0)}% DWallet, ${(assumptions.activeConsent * 100).toFixed(0)}% consent) with ${certs} certificates per trip from branded products across categories.`;
+    }
+  };
+
   const DashboardView = () => {
     // Calculate metrics based on whether network effects are shown
     // When network effects are on, use fullNetworkResults (real retailer volumes with Metcalfe's Law)
@@ -576,6 +593,29 @@ export default function DrumWaveWalmartTool() {
       displayActiveCerts = month36.activeCertPool;
       networkMultiplier = 1.0;
     }
+    
+    // Calculate annual metrics for KEY INSIGHT
+    const annualWalmartRevenue = displayCumulativeRetailer / 3;
+    const optedInCustomers = assumptions.totalCustomers * effectiveOptIn;
+    const annualConsumerEarnings = displayCumulativeConsumer / 3;
+    const annualEarningsPerCustomer = optedInCustomers > 0 
+      ? annualConsumerEarnings / optedInCustomers 
+      : 0;
+
+    // Estimate GMV (assuming $5,000 annual spend per opted-in customer)
+    const AVG_ANNUAL_SPEND = 5000;
+    const estimatedAnnualGMV = optedInCustomers * AVG_ANNUAL_SPEND;
+    const revenueAsPercentOfGMV = estimatedAnnualGMV > 0
+      ? (annualWalmartRevenue / estimatedAnnualGMV) * 100
+      : 0;
+
+    // Average certificates per transaction
+    const avgCertsPerTrip = (assumptions.itemFloor + assumptions.itemCeiling) / 2;
+
+    // Format for display
+    const formattedOptedInM = (optedInCustomers / 1000000).toFixed(1);
+    const formattedEarningsPerYear = Math.round(annualEarningsPerCustomer);
+    const formattedGMVPercent = revenueAsPercentOfGMV.toFixed(2);
     
     return (
       <div className="space-y-8">
@@ -678,25 +718,28 @@ export default function DrumWaveWalmartTool() {
           {!showNetworkEffects ? (
             <>
               <p className="text-gray-700 text-lg leading-relaxed mb-3">
-                At {formatPercent(effectiveOptIn)} adoption, Walmart generates {formatCurrency(cumulativeRetailer)} in new 
-                revenue over 3 years from existing transactions—no change to shopper experience. Consumers earn {formatCurrency(cumulativeConsumer)}, 
-                creating a virtuous cycle of adoption and value.
+                At {formatPercent(effectiveOptIn)} participation ({formattedOptedInM}M customers), 
+                Walmart generates {formatCurrency(annualWalmartRevenue)} annually from certificates 
+                created from existing transactions. That's {formattedGMVPercent}% of GMV—a modest 
+                data dividend that rewards participating consumers ${formattedEarningsPerYear} per year.
               </p>
               <p className="text-gray-600 text-base">
-                <strong>Note:</strong> Scenarios vary across 7 dimensions (adoption, transactions, license pricing, reuse rates, and more) 
-                to model skeptical/realistic/enthusiastic market conditions.
+                <strong>{customMode ? 'Custom' : scenario} scenario:</strong> {getScenarioDescription(scenario, avgCertsPerTrip, assumptions)}
               </p>
             </>
           ) : (
             <>
               <p className="text-gray-700 text-lg leading-relaxed mb-3">
-                With 5 retailers in the network, Walmart's certificates become {networkMultiplier.toFixed(2)}× more valuable due to Metcalfe's Law. 
-                Brands pay a {((networkMultiplier - 1) * 100).toFixed(0)}% premium for cross-retailer insights. Walmart's revenue 
-                reaches {formatCurrency(displayCumulativeRetailer)} while consumers earn {formatCurrency(displayCumulativeConsumer)}.
+                With {formattedOptedInM}M participating customers ({formatPercent(effectiveOptIn)}), 
+                the 5-retailer network makes certificates {networkMultiplier.toFixed(2)}× more valuable. 
+                Walmart generates {formatCurrency(annualWalmartRevenue)} annually while participating 
+                consumers earn ${formattedEarningsPerYear} per year—a {((networkMultiplier - 1) * 100).toFixed(0)}% 
+                boost from network effects.
               </p>
               <p className="text-gray-600 text-base">
-                <strong>Network Effect:</strong> This is value creation (higher prices per license), not redistribution. 
-                Walmart earns on their own certificates—they just become more valuable in a larger network.
+                <strong>Network Effect:</strong> Brands pay a premium for cross-retailer insights. 
+                This is value creation, not redistribution—Walmart earns on their own certificates, 
+                they just become more valuable in a larger network.
               </p>
             </>
           )}
