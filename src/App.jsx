@@ -484,6 +484,17 @@ export default function DrumWaveWalmartTool() {
     [assumptions]
   );
 
+  // Calculate Low and High scenario results for comparison table
+  const lowScenarioResults = useMemo(
+    () => calculateMonthlyResults(PRESETS.Low),
+    []  // Empty deps = calculate once on mount
+  );
+
+  const highScenarioResults = useMemo(
+    () => calculateMonthlyResults(PRESETS.High),
+    []
+  );
+
   const networkResults = useMemo(
     () => calculateNetworkScenario(singleRetailerResults, networkSize, effectiveOptIn),
     [singleRetailerResults, networkSize, effectiveOptIn]
@@ -1629,63 +1640,188 @@ export default function DrumWaveWalmartTool() {
         </div>
       </div>
 
+
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Scenario Comparison</h3>
+        
+        {/* Status Indicator */}
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-semibold text-gray-700">Active Scenario:</span>
+              <span className="ml-2 text-sm text-gray-900">
+                {customMode ? `Custom (based on ${scenario})` : scenario}
+              </span>
+            </div>
+            {customMode && (
+              <button
+                onClick={resetToBase}
+                className="text-xs text-blue-600 hover:text-blue-800 underline"
+              >
+                Reset to Base
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-100">
               <tr>
                 <th className="px-4 py-2 text-left font-semibold text-gray-700">Parameter</th>
                 <th className="px-4 py-2 text-center font-semibold text-gray-700">Low</th>
-                <th className="px-4 py-2 text-center font-semibold text-blue-700">Base</th>
+                <th className="px-4 py-2 text-center font-semibold text-gray-700">Base</th>
                 <th className="px-4 py-2 text-center font-semibold text-gray-700">High</th>
+                <th className="px-4 py-2 text-center font-semibold text-blue-700">Current</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              <tr>
-                <td className="px-4 py-2 text-gray-600">Effective Opt-in</td>
-                <td className="px-4 py-2 text-center">28%</td>
-                <td className="px-4 py-2 text-center font-semibold">56%</td>
-                <td className="px-4 py-2 text-center">76.5%</td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 text-gray-600">Transactions/Year</td>
-                <td className="px-4 py-2 text-center">50</td>
-                <td className="px-4 py-2 text-center font-semibold">65</td>
-                <td className="px-4 py-2 text-center">80</td>
-              </tr>
-              <tr className="bg-yellow-50">
-                <td className="px-4 py-2 text-gray-600 font-medium">Consented Re-Use License Fee</td>
-                <td className="px-4 py-2 text-center">$0.100</td>
-                <td className="px-4 py-2 text-center font-semibold">$0.175</td>
-                <td className="px-4 py-2 text-center">$0.200</td>
-              </tr>
-              <tr className="bg-yellow-50">
-                <td className="px-4 py-2 text-gray-600 font-medium">Reuse Rate</td>
-                <td className="px-4 py-2 text-center">2×/year</td>
-                <td className="px-4 py-2 text-center font-semibold">4×/year</td>
-                <td className="px-4 py-2 text-center">6×/year</td>
-              </tr>
-              <tr className="bg-yellow-50">
-                <td className="px-4 py-2 text-gray-600 font-medium">Item Range</td>
-                <td className="px-4 py-2 text-center">1-3</td>
-                <td className="px-4 py-2 text-center font-semibold">2-8</td>
-                <td className="px-4 py-2 text-center">3-12</td>
-              </tr>
-              <tr className="bg-gray-50 font-semibold">
-                <td className="px-4 py-2 text-gray-900">36-Mo Walmart Revenue</td>
-                <td className="px-4 py-2 text-center">{formatCurrency(373919867)}</td>
-                <td className="px-4 py-2 text-center text-blue-700">{formatCurrency(3390359800)}</td>
-                <td className="px-4 py-2 text-center">{formatCurrency(10790132673)}</td>
-              </tr>
+              {(() => {
+                // Helper to format scenario data for table
+                const getScenarioData = (presetName, results) => {
+                  const preset = PRESETS[presetName];
+                  const effectiveOptIn = preset.dwalletAdoption * preset.activeConsent;
+                  const revenue = results[35].cumulativeRetailerRev;
+                  
+                  return {
+                    effectiveOptIn: `${(effectiveOptIn * 100).toFixed(1)}%`,
+                    transactions: preset.annualTransactions,
+                    licenseFee: `$${preset.licenseFee.toFixed(3)}`,
+                    reuseRate: `${preset.usesPerCertPerYear}×/year`,
+                    itemRange: `${preset.itemFloor}-${preset.itemCeiling}`,
+                    revenue: formatCurrency(revenue)
+                  };
+                };
+                
+                // Calculate data for all scenarios
+                const lowData = getScenarioData('Low', lowScenarioResults);
+                const baseData = getScenarioData('Base', singleRetailerResults);
+                const highData = getScenarioData('High', highScenarioResults);
+                
+                // Current scenario data
+                const currentEffectiveOptIn = assumptions.dwalletAdoption * assumptions.activeConsent;
+                const currentData = {
+                  effectiveOptIn: `${(currentEffectiveOptIn * 100).toFixed(1)}%`,
+                  transactions: assumptions.annualTransactions,
+                  licenseFee: `$${assumptions.licenseFee.toFixed(3)}`,
+                  reuseRate: `${assumptions.usesPerCertPerYear}×/year`,
+                  itemRange: `${assumptions.itemFloor}-${assumptions.itemCeiling}`,
+                  revenue: formatCurrency(cumulativeRetailer)
+                };
+                
+                // Helper to check if value differs from base
+                const isDifferentFromBase = (currentVal, baseVal) => currentVal !== baseVal;
+                
+                return (
+                  <>
+                    {/* Effective Opt-in */}
+                    <tr>
+                      <td className="px-4 py-2 text-gray-600">Effective Opt-in</td>
+                      <td className="px-4 py-2 text-center">{lowData.effectiveOptIn}</td>
+                      <td className="px-4 py-2 text-center">{baseData.effectiveOptIn}</td>
+                      <td className="px-4 py-2 text-center">{highData.effectiveOptIn}</td>
+                      <td className={`px-4 py-2 text-center font-semibold ${
+                        isDifferentFromBase(currentData.effectiveOptIn, baseData.effectiveOptIn)
+                          ? 'bg-blue-50 text-blue-900'
+                          : ''
+                      }`}>
+                        {currentData.effectiveOptIn}
+                      </td>
+                    </tr>
+                    
+                    {/* Transactions/Year */}
+                    <tr>
+                      <td className="px-4 py-2 text-gray-600">Transactions/Year</td>
+                      <td className="px-4 py-2 text-center">{lowData.transactions}</td>
+                      <td className="px-4 py-2 text-center">{baseData.transactions}</td>
+                      <td className="px-4 py-2 text-center">{highData.transactions}</td>
+                      <td className={`px-4 py-2 text-center font-semibold ${
+                        isDifferentFromBase(currentData.transactions, baseData.transactions)
+                          ? 'bg-blue-50 text-blue-900'
+                          : ''
+                      }`}>
+                        {currentData.transactions}
+                      </td>
+                    </tr>
+                    
+                    {/* Consented Re-Use License Fee */}
+                    <tr className="bg-yellow-50">
+                      <td className="px-4 py-2 text-gray-600 font-medium">Consented Re-Use License Fee</td>
+                      <td className="px-4 py-2 text-center">{lowData.licenseFee}</td>
+                      <td className="px-4 py-2 text-center">{baseData.licenseFee}</td>
+                      <td className="px-4 py-2 text-center">{highData.licenseFee}</td>
+                      <td className={`px-4 py-2 text-center font-semibold ${
+                        isDifferentFromBase(currentData.licenseFee, baseData.licenseFee)
+                          ? 'bg-blue-100 text-blue-900'
+                          : 'bg-yellow-50'
+                      }`}>
+                        {currentData.licenseFee}
+                      </td>
+                    </tr>
+                    
+                    {/* Reuse Rate */}
+                    <tr className="bg-yellow-50">
+                      <td className="px-4 py-2 text-gray-600 font-medium">Reuse Rate</td>
+                      <td className="px-4 py-2 text-center">{lowData.reuseRate}</td>
+                      <td className="px-4 py-2 text-center">{baseData.reuseRate}</td>
+                      <td className="px-4 py-2 text-center">{highData.reuseRate}</td>
+                      <td className={`px-4 py-2 text-center font-semibold ${
+                        isDifferentFromBase(currentData.reuseRate, baseData.reuseRate)
+                          ? 'bg-blue-100 text-blue-900'
+                          : 'bg-yellow-50'
+                      }`}>
+                        {currentData.reuseRate}
+                      </td>
+                    </tr>
+                    
+                    {/* Item Range */}
+                    <tr className="bg-yellow-50">
+                      <td className="px-4 py-2 text-gray-600 font-medium">Item Range</td>
+                      <td className="px-4 py-2 text-center">{lowData.itemRange}</td>
+                      <td className="px-4 py-2 text-center">{baseData.itemRange}</td>
+                      <td className="px-4 py-2 text-center">{highData.itemRange}</td>
+                      <td className={`px-4 py-2 text-center font-semibold ${
+                        isDifferentFromBase(currentData.itemRange, baseData.itemRange)
+                          ? 'bg-blue-100 text-blue-900'
+                          : 'bg-yellow-50'
+                      }`}>
+                        {currentData.itemRange}
+                      </td>
+                    </tr>
+                    
+                    {/* 36-Month Walmart Revenue */}
+                    <tr className="bg-gray-50 font-semibold">
+                      <td className="px-4 py-2 text-gray-900">36-Mo Walmart Revenue</td>
+                      <td className="px-4 py-2 text-center">{lowData.revenue}</td>
+                      <td className="px-4 py-2 text-center">{baseData.revenue}</td>
+                      <td className="px-4 py-2 text-center">{highData.revenue}</td>
+                      <td className="px-4 py-2 text-center text-blue-700">{currentData.revenue}</td>
+                    </tr>
+                  </>
+                );
+              })()}
             </tbody>
           </table>
         </div>
-        <div className="mt-3 text-xs text-gray-600">
-          <span className="inline-block w-4 h-4 bg-yellow-50 border border-yellow-200 mr-1 align-middle"></span>
-          Highlighted rows show parameters that vary across scenarios (not just adoption/volume)
+        
+        {/* Updated Legend */}
+        <div className="mt-3 text-xs text-gray-600 space-y-1">
+          <div>
+            <span className="inline-block w-4 h-4 bg-yellow-50 border border-yellow-200 mr-1 align-middle"></span>
+            Parameters that vary across scenarios (not just adoption/volume)
+          </div>
+          <div>
+            <span className="inline-block w-4 h-4 bg-blue-50 border border-blue-200 mr-1 align-middle"></span>
+            Current value differs from Base scenario
+          </div>
+          {customMode && (
+            <div className="text-blue-700 font-medium mt-2">
+              ⚙️ Custom mode active - Current column shows your modified assumptions
+            </div>
+          )}
         </div>
       </div>
+
 
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Network Effects Methodology</h3>
