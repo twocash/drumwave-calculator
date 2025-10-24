@@ -669,7 +669,7 @@ export default function DrumWaveWalmartTool() {
         </div>
 
         {/* Scorecards Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
           <div className="scorecard">
             <div className="scorecard-label">WALMART REVENUE</div>
             <div className="scorecard-value">{formatCurrency(displayCumulativeRetailer)}</div>
@@ -696,6 +696,19 @@ export default function DrumWaveWalmartTool() {
             {showNetworkEffects && (
               <div className="scorecard-badge">
                 {(displayCumulativeConsumer / cumulativeConsumer).toFixed(1)}× baseline
+              </div>
+            )}
+          </div>
+
+          <div className="scorecard">
+            <div className="scorecard-label">CONSUMER EARNINGS</div>
+            <div className="scorecard-value">
+              ${(displayCumulativeConsumer / 3 / optedInCustomers).toFixed(2)}/year
+            </div>
+            <div className="scorecard-subtitle">Per Opted-In Customer</div>
+            {showNetworkEffects && (
+              <div className="scorecard-badge">
+                {((displayCumulativeConsumer / cumulativeConsumer)).toFixed(1)}× baseline
               </div>
             )}
           </div>
@@ -971,9 +984,9 @@ export default function DrumWaveWalmartTool() {
             </div>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm font-semibold text-gray-600 mb-1">Consumer Annual Earnings</div>
+            <div className="text-sm font-semibold text-gray-600 mb-1">Consumer Earnings per Customer</div>
             <div className="text-2xl font-bold text-gray-900">
-              ${(cumulativeConsumer / (assumptions.totalCustomers * effectiveOptIn) / 3).toFixed(2)}
+              ${(cumulativeConsumer / (assumptions.totalCustomers * effectiveOptIn) / 3).toFixed(2)}/year
             </div>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
@@ -1178,7 +1191,7 @@ export default function DrumWaveWalmartTool() {
         )}
 
         {/* Aggregate Network Metrics */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
           <div className="scorecard">
             <div className="scorecard-label">TOTAL NETWORK REVENUE</div>
             <div className="scorecard-value">{formatCurrency(totalNetworkRevenue)}</div>
@@ -1199,6 +1212,14 @@ export default function DrumWaveWalmartTool() {
             <div className="scorecard-label">CONSUMER EARNINGS</div>
             <div className="scorecard-value">{formatCurrency(totalConsumerEarnings)}</div>
             <div className="scorecard-subtitle">Network-wide, 36 Months</div>
+          </div>
+
+          <div className="scorecard">
+            <div className="scorecard-label">WALMART CONSUMER EARNINGS</div>
+            <div className="scorecard-value">
+              ${((retailerTotals.find(r => r.id === 'walmart')?.totalConsumer || 0) / 3 / (assumptions.totalCustomers * effectiveOptIn)).toFixed(2)}/year
+            </div>
+            <div className="scorecard-subtitle">Per Walmart Customer</div>
           </div>
 
           <div className="scorecard">
