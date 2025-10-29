@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import ConfigurationFlyout from './components/ConfigurationFlyout'; // added in phase 3
+import KpiStrip from './components/KpiStrip'; // added in Step 5
 
 // ==================== CALCULATION ENGINE ====================
 
@@ -180,7 +182,12 @@ const PRESETS = {
     mintingFee: 0.10,
     licenseFee: 0.150,
     usesPerCertPerYear: 3,
-    royaltyMargin: 0.95
+    royaltyMargin: 0.95,
+    // Cost structure for EBIT calculation
+    bankShare: 0.02,
+    dataAgentShare: 0.02,
+    platformFee: 0.05,
+    sgaOverhead: 0.04
   },
   Base: {
     totalCustomers: 120000000,
@@ -195,7 +202,12 @@ const PRESETS = {
     mintingFee: 0.10,
     licenseFee: 0.175,
     usesPerCertPerYear: 4,
-    royaltyMargin: 0.95
+    royaltyMargin: 0.95,
+    // Cost structure for EBIT calculation
+    bankShare: 0.02,
+    dataAgentShare: 0.02,
+    platformFee: 0.05,
+    sgaOverhead: 0.04
   },
   High: {
     totalCustomers: 120000000,
@@ -210,7 +222,12 @@ const PRESETS = {
     mintingFee: 0.10,
     licenseFee: 0.200,
     usesPerCertPerYear: 6,
-    royaltyMargin: 0.95
+    royaltyMargin: 0.95,
+    // Cost structure for EBIT calculation
+    bankShare: 0.02,
+    dataAgentShare: 0.02,
+    platformFee: 0.05,
+    sgaOverhead: 0.04
   }
 };
 
@@ -475,6 +492,8 @@ export default function DrumWaveWalmartTool() {
   const [networkRetailers, setNetworkRetailers] = useState(DEFAULT_RETAILERS);
   const [metcalfeCoefficient, setMetcalfeCoefficient] = useState(0.5);
   const [showRetailerConfig, setShowRetailerConfig] = useState(false);
+  const [showConfigFlyout, setShowConfigFlyout] = useState(false);
+
 
   const assumptions = customMode && customAssumptions ? customAssumptions : PRESETS[scenario];
   const effectiveOptIn = assumptions.dwalletAdoption * assumptions.activeConsent;
@@ -605,10 +624,73 @@ export default function DrumWaveWalmartTool() {
       networkMultiplier = 1.0;
     }
     
-    // Calculate annual metrics for KEY INSIGHT
-    const annualWalmartRevenue = displayCumulativeRetailer / 3;
+    // --- BEGIN EBIT / REVENUE ROLLUP BLOCK (Step 5a) ---
+    
+    // Walmart cumulative revenue over 36 months
+    const walmartRevenue36 = displayCumulativeRetailer || 0;
+    
+    // Approximate annualized Walmart revenue (1-year run rate view)
+    const walmartAnnualizedRevenue = walmartRevenue36 / 3;
+    
+    // Consumer earnings cumulative over 36 months
+    const consumerEarnings36 = displayCumulativeConsumer || 0;
+    const consumerAnnualizedEarnings = consumerEarnings36 / 3;
+    
+    // Opted-in customers (used for per-customer metrics)
     const optedInCustomers = assumptions.totalCustomers * effectiveOptIn;
-    const annualConsumerEarnings = displayCumulativeConsumer / 3;
+    
+    // --- EBIT model assumptions ---
+    // Read cost structure from assumptions (with fallback defaults)
+    const grossRoyaltyMargin = assumptions.royaltyMargin || 0.95;
+    const bankShare = assumptions.bankShare || 0.02;
+    const dataAgentShare = assumptions.dataAgentShare || 0.02;
+    const platformFee = assumptions.platformFee || 0.05;
+    const sgaOverhead = assumptions.sgaOverhead || 0.04;
+    
+    // Compute gross profit from DrumWave revenue
+    const grossProfit = walmartAnnualizedRevenue * grossRoyaltyMargin;
+    
+    // Total operating costs we subtract to get EBIT
+    const operatingCosts = walmartAnnualizedRevenue * (bankShare + dataAgentShare + platformFee + sgaOverhead);
+    
+    // EBIT dollars (annualized run-rate)
+    const walmartEbitAnnualized = grossProfit - operatingCosts;
+    
+    // EBIT margin (% of revenue)
+    const ebitMarginPct = walmartAnnualizedRevenue > 0
+      ? (walmartEbitAnnualized / walmartAnnualizedRevenue) * 100
+      : 0;
+    
+    // Network lift % - Compare 36-month cumulative revenue (standalone vs network)
+    // Use unrounded cumulative values for accuracy
+    const standaloneCumulativeRevenue = cumulativeRetailer;
+    const networkCumulativeRevenue = displayCumulativeRetailer;
+    
+    const networkLiftRaw = standaloneCumulativeRevenue > 0
+      ? ((networkCumulativeRevenue - standaloneCumulativeRevenue) / standaloneCumulativeRevenue) * 100
+      : 0;
+    
+    // Round once for display consistency
+    const networkLiftDisplayPercent = parseFloat(networkLiftRaw.toFixed(1));
+    
+    // Build a `results` bundle for KpiStrip
+    const results = {
+      walmartAnnualizedRevenue,
+      walmartEbitAnnualized,
+      ebitMarginPct,
+      consumerAnnualizedEarnings,
+      optedInCustomers,
+      networkLiftDisplayPercent,
+      standaloneCumulativeRevenue,
+      networkCumulativeRevenue,
+      showNetworkEffects
+    };
+    
+    // --- END EBIT / REVENUE ROLLUP BLOCK ---
+    
+    // Calculate annual metrics for KEY INSIGHT (keeping for backwards compatibility)
+    const annualWalmartRevenue = walmartAnnualizedRevenue; // Use from results
+    const annualConsumerEarnings = consumerAnnualizedEarnings; // Use from results
     const annualEarningsPerCustomer = optedInCustomers > 0 
       ? annualConsumerEarnings / optedInCustomers 
       : 0;
@@ -677,7 +759,26 @@ export default function DrumWaveWalmartTool() {
               </div>
             )}
           </div>
+
+          {/* Scenario Summary */}
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-600">
+            <p className="text-sm text-gray-700">
+              <strong>Current model: {customMode ? 'Custom' : scenario}.</strong> 
+              {' '}{getScenarioDescription(scenario, avgCertsPerTrip, assumptions)} 
+              {' '}Edit assumptions in Configuration.
+            </p>
+          </div>
         </div>
+
+        {/* KPI Strip - Executive Summary Metrics */}
+        <KpiStrip
+          walmartRevenue={results.walmartAnnualizedRevenue}
+          walmartEbit={results.walmartEbitAnnualized}
+          consumerEarnings={results.consumerAnnualizedEarnings}
+          optedInCustomers={results.optedInCustomers}
+          networkLiftPercent={results.networkLiftDisplayPercent}
+          showNetworkEffects={results.showNetworkEffects}
+        />
 
         {/* Scorecards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
@@ -695,7 +796,7 @@ export default function DrumWaveWalmartTool() {
           <div className="scorecard">
             <div className="scorecard-label">EBIT PER CUSTOMER</div>
             <div className="scorecard-value">
-              ${((displayCumulativeRetailer * assumptions.royaltyMargin) / (assumptions.totalCustomers * effectiveOptIn)).toFixed(2)}
+              ${((results.walmartEbitAnnualized * 3) / results.optedInCustomers).toFixed(2)}
             </div>
             <div className="scorecard-subtitle">Per Opted-In Customer</div>
           </div>
@@ -797,188 +898,53 @@ export default function DrumWaveWalmartTool() {
       Others: (r.dataAgentRevenue + r.drumwaveRevenue) / 1000000
     }));
 
+    const scenarioLabel = customMode ? 'Custom' : scenario;
+
     return (
       <div className="space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Walmart Standalone Economics</h2>
-          <p className="text-gray-600">Single-retailer model with {formatPercent(effectiveOptIn)} effective opt-in rate</p>
+          <p className="text-gray-600">Single-retailer model showing Walmart's revenue from DrumWave data licensing</p>
         </div>
 
-        <div className="flex gap-4 flex-wrap">
-          {['Low', 'Base', 'High'].map((preset) => (
-            <button
-              key={preset}
-              onClick={() => handlePresetClick(preset)}
-              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                scenario === preset && !customMode
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-blue-400'
-              }`}
-            >
-              {preset}
-            </button>
-          ))}
-          <button
-            onClick={() => setCustomMode(!customMode)}
-            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-              customMode
-                ? 'bg-purple-600 text-white'
-                : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-purple-400'
-            }`}
-          >
-            Custom
-          </button>
+        {/* Read-only Assumptions Summary */}
+        <div className="bg-blue-50 rounded-lg p-6 border-l-4 border-blue-600">
+          <h3 className="text-lg font-bold text-gray-900 mb-3">Current Model Assumptions ({scenarioLabel})</h3>
+          <p className="text-sm text-gray-700 mb-4">
+            This view shows Walmart standalone economics under <strong>{scenarioLabel}</strong>: 
+            {' '}<strong>{formatPercent(effectiveOptIn)}</strong> opt-in rate, 
+            {' '}<strong>{assumptions.annualTransactions}</strong> transactions/year, 
+            {' '}<strong>{assumptions.usesPerCertPerYear}×</strong> reuse per certificate, 
+            {' '}<strong>${assumptions.licenseFee.toFixed(3)}</strong> license fee per reuse.
+          </p>
+          <p className="text-xs text-gray-600 italic">
+            Edit assumptions in Configuration to modify these values.
+          </p>
         </div>
 
-        <div className="grid lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-1 space-y-4">
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm font-semibold text-gray-600 mb-1">Adoption Rate</div>
-              <div className="text-2xl font-bold text-gray-900">{formatPercent(effectiveOptIn)}</div>
-              {customMode && (
-                <div className="mt-2">
-                  <input
-                    type="range"
-                    min="0.28"
-                    max="0.85"
-                    step="0.01"
-                    value={assumptions.dwalletAdoption * assumptions.activeConsent}
-                    onChange={(e) => {
-                      const newOptIn = parseFloat(e.target.value);
-                      handleCustomChange('dwalletAdoption', newOptIn / assumptions.activeConsent);
-                    }}
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm font-semibold text-gray-600 mb-1">Transactions/Year</div>
-              <div className="text-2xl font-bold text-gray-900">{assumptions.annualTransactions}</div>
-              {customMode && (
-                <div className="mt-2">
-                  <input
-                    type="range"
-                    min="50"
-                    max="80"
-                    step="1"
-                    value={assumptions.annualTransactions}
-                    onChange={(e) => handleCustomChange('annualTransactions', parseInt(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm font-semibold text-gray-600 mb-1">Brand Ramp</div>
-              <div className="text-2xl font-bold text-gray-900">{assumptions.monthsToFull} mo</div>
-              {customMode && (
-                <div className="mt-2">
-                  <input
-                    type="range"
-                    min="18"
-                    max="48"
-                    step="6"
-                    value={assumptions.monthsToFull}
-                    onChange={(e) => handleCustomChange('monthsToFull', parseInt(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm font-semibold text-gray-600 mb-1">Consented Re-Use License Fee</div>
-              <div className="text-2xl font-bold text-gray-900">${assumptions.licenseFee.toFixed(3)}</div>
-              {customMode && (
-                <div className="mt-2">
-                  <input
-                    type="range"
-                    min="0.100"
-                    max="0.200"
-                    step="0.005"
-                    value={assumptions.licenseFee}
-                    onChange={(e) => handleCustomChange('licenseFee', parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm font-semibold text-gray-600 mb-1">Reuse Rate</div>
-              <div className="text-2xl font-bold text-gray-900">{assumptions.usesPerCertPerYear}×/year</div>
-              {customMode && (
-                <div className="mt-2">
-                  <input
-                    type="range"
-                    min="2"
-                    max="6"
-                    step="0.5"
-                    value={assumptions.usesPerCertPerYear}
-                    onChange={(e) => handleCustomChange('usesPerCertPerYear', parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm font-semibold text-gray-600 mb-1">Royalty Margin</div>
-              <div className="text-2xl font-bold text-gray-900">{formatPercent(assumptions.royaltyMargin)}</div>
-              {customMode && (
-                <div className="mt-2">
-                  <input
-                    type="range"
-                    min="0.50"
-                    max="0.95"
-                    step="0.05"
-                    value={assumptions.royaltyMargin}
-                    onChange={(e) => handleCustomChange('royaltyMargin', parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </div>
-
-            {customMode && (
-              <button
-                onClick={resetToBase}
-                className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-              >
-                Reset to Base
-              </button>
-            )}
-          </div>
-
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Over 36 Months</h3>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis 
-                    dataKey="month" 
-                    label={{ value: 'Month', position: 'insideBottom', offset: -5 }}
-                  />
-                  <YAxis 
-                    label={{ value: 'Revenue ($M)', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip 
-                    formatter={(value) => `$${value.toFixed(1)}M`}
-                    contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc' }}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="Walmart" stroke="#10B981" strokeWidth={3} dot={false} />
-                  <Line type="monotone" dataKey="Consumers" stroke="#3B82F6" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="Brands" stroke="#F59E0B" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="Others" stroke="#6B7280" strokeWidth={1} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Over 36 Months</h3>
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis 
+                dataKey="month" 
+                label={{ value: 'Month', position: 'insideBottom', offset: -5 }}
+              />
+              <YAxis 
+                label={{ value: 'Revenue ($M)', angle: -90, position: 'insideLeft' }}
+              />
+              <Tooltip 
+                formatter={(value) => `$${value.toFixed(1)}M`}
+                contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc' }}
+              />
+              <Legend />
+              <Line type="monotone" dataKey="Walmart" stroke="#10B981" strokeWidth={3} dot={false} />
+              <Line type="monotone" dataKey="Consumers" stroke="#3B82F6" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="Brands" stroke="#F59E0B" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="Others" stroke="#6B7280" strokeWidth={1} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
 
         <div className="grid md:grid-cols-4 gap-4">
@@ -1076,21 +1042,21 @@ export default function DrumWaveWalmartTool() {
               </svg>
             </div>
             <div className="ml-3 flex-1">
-              <h3 className="text-sm font-semibold text-blue-900">Network Scenario Always Active</h3>
+              <h3 className="text-sm font-semibold text-blue-900">Phased Rollout Network</h3>
               <p className="mt-1 text-sm text-blue-800">
-                This view always displays the full 5-retailer network scenario with phased rollout. 
-                Values shown here are independent of the Network Effects toggle on the Executive Summary tab.
+                This view always shows a phased rollout. Retailers join at different launch months, which drives network scale over time.
+                Only Walmart is active at Month 1. Additional retailers onboard later, so the early network total can be below Walmart standalone.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Metcalfe Coefficient Control */}
+        {/* Network Multiplier Display */}
         <div className="control-panel">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-bold text-gray-900">Network Value Formula (Metcalfe's Law)</h3>
-              <p className="text-sm text-gray-600">License Fee Multiplier = 1 + (k × n² / n_max²)</p>
+              <h3 className="text-lg font-bold text-gray-900">Network Value (Metcalfe's Law)</h3>
+              <p className="text-sm text-gray-600">License fees increase as network grows: 1 + (k × n² / n_max²)</p>
             </div>
             <button
               onClick={() => setShowRetailerConfig(!showRetailerConfig)}
@@ -1100,40 +1066,22 @@ export default function DrumWaveWalmartTool() {
             </button>
           </div>
           
-          <div className="flex items-center gap-6">
-            <div className="flex-1">
-              <label className="text-sm font-semibold text-gray-700 mb-2 block">
-                Network Coefficient (k): {metcalfeCoefficient.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min="0.1"
-                max="1.0"
-                step="0.05"
-                value={metcalfeCoefficient}
-                onChange={(e) => setMetcalfeCoefficient(parseFloat(e.target.value))}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Conservative (0.1)</span>
-                <span>Aggressive (1.0)</span>
-              </div>
+          <div className="scorecard" style={{ width: '100%', maxWidth: '300px', margin: '0 auto' }}>
+            <div className="scorecard-label">NETWORK MULTIPLIER</div>
+            <div className="scorecard-value" style={{ fontSize: '2rem' }}>
+              {networkMonth36.networkMultiplier.toFixed(2)}×
             </div>
-            
-            <div className="scorecard" style={{ minWidth: '200px' }}>
-              <div className="scorecard-label">NETWORK MULTIPLIER</div>
-              <div className="scorecard-value" style={{ fontSize: '2rem' }}>
-                {networkMonth36.networkMultiplier.toFixed(2)}×
-              </div>
-              <div className="scorecard-subtitle">Month 36 (5 retailers)</div>
-            </div>
+            <div className="scorecard-subtitle">Month 36 (5 retailers active)</div>
           </div>
+          <p className="text-xs text-gray-600 text-center mt-4 italic">
+            Edit network coefficient (k) in Configuration to adjust network effects strength
+          </p>
         </div>
 
         {/* Retailer Configuration Panel */}
         {showRetailerConfig && (
           <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-blue-200">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Retailer Network Configuration</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Configure Network Rollout Assumptions</h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {networkRetailers.map((retailer, idx) => (
                 <div key={retailer.id} className="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-colors">
@@ -1498,36 +1446,49 @@ export default function DrumWaveWalmartTool() {
         </div>
 
         {/* Controls */}
-        <div className="flex justify-between items-center bg-white rounded-lg shadow p-4">
-          <div className="flex gap-4">
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex gap-4">
+              <button
+                onClick={() => setViewMode('standalone')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  viewMode === 'standalone'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                Walmart Standalone
+              </button>
+              <button
+                onClick={() => setViewMode('network')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  viewMode === 'network'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                Network Aggregates
+              </button>
+            </div>
+            
             <button
-              onClick={() => setViewMode('standalone')}
-              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-                viewMode === 'standalone'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+              onClick={exportToCSV}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center gap-2"
             >
-              Walmart Standalone
-            </button>
-            <button
-              onClick={() => setViewMode('network')}
-              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-                viewMode === 'network'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              Network Aggregates
+              <span>⬇</span> Export CSV
             </button>
           </div>
-          
-          <button
-            onClick={exportToCSV}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center gap-2"
-          >
-            <span>⬇</span> Export CSV
-          </button>
+
+          {/* Helper Text Under Toggle */}
+          {viewMode === 'network' && (
+            <div className="mt-2 p-3 bg-blue-50 rounded border-l-4 border-blue-600">
+              <p className="text-sm text-gray-700">
+                <strong>Network Aggregates</strong> shows phased rollout. Only Walmart is active at Month 1. 
+                Additional retailers onboard later, so early network totals can be below Walmart standalone. 
+                Full network effects emerge as all retailers scale.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Scrollable Table */}
@@ -1816,7 +1777,7 @@ export default function DrumWaveWalmartTool() {
           </div>
           {customMode && (
             <div className="text-blue-700 font-medium mt-2">
-              ⚙️ Custom mode active - Current column shows your modified assumptions
+              Custom assumptions active (set via Configuration).
             </div>
           )}
         </div>
@@ -1888,11 +1849,24 @@ export default function DrumWaveWalmartTool() {
 
   // ==================== MAIN RENDER ====================
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm mb-6">
-          <div className="flex border-b">
+ // ==================== MAIN RENDER ====================
+
+return (
+  <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="max-w-7xl mx-auto">
+
+      {/* Header with tabs and config button */}
+      <div className="bg-white rounded-lg shadow-sm mb-6">
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderBottom: '1px solid #e2e8f0'
+          }}
+        >
+          {/* Tab navigation */}
+          <div className="flex" style={{ flex: 1 }}>
             {[
               { id: 'dashboard', label: 'Executive Summary' },
               { id: 'standalone', label: 'Standalone Model' },
@@ -1913,16 +1887,80 @@ export default function DrumWaveWalmartTool() {
               </button>
             ))}
           </div>
-        </div>
 
-        <div className="bg-gray-50 rounded-lg p-6">
-          {activeView === 'dashboard' && <DashboardView />}
-          {activeView === 'standalone' && <StandaloneView />}
-          {activeView === 'network' && <NetworkView />}
-          {activeView === 'monthly' && <MonthlyView />}
-          {activeView === 'details' && <DetailsView />}
+          {/* Configuration button */}
+          <div style={{ padding: '0.5rem 1rem' }}>
+            <button
+              onClick={() => setShowConfigFlyout(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.25rem',
+                fontSize: '0.9375rem',
+                fontWeight: '600',
+                color: '#ffffff',
+                background:
+                  'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                boxShadow:
+                  '0 4px 12px -2px rgba(102, 126, 234, 0.4)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow =
+                  '0 6px 16px -2px rgba(102, 126, 234, 0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow =
+                  '0 4px 12px -2px rgba(102, 126, 234, 0.4)';
+              }}
+            >
+              <span style={{ fontSize: '1.25rem' }}>⚙</span>
+              <span>Configuration</span>
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Active view body */}
+      <div className="bg-gray-50 rounded-lg p-6">
+        {activeView === 'dashboard' && <DashboardView />}
+        {activeView === 'standalone' && <StandaloneView />}
+        {activeView === 'network' && <NetworkView />}
+        {activeView === 'monthly' && <MonthlyView />}
+        {activeView === 'details' && <DetailsView />}
+      </div>
     </div>
-  );
+
+    {/* Configuration Flyout lives at the root so it can overlay everything */}
+    <ConfigurationFlyout
+      isOpen={showConfigFlyout}
+      onClose={() => setShowConfigFlyout(false)}
+      scenario={scenario}
+      customMode={customMode}
+      onScenarioChange={(preset) => {
+        setScenario(preset);
+        setCustomMode(false);
+        setCustomAssumptions(null);
+      }}
+      onResetToBase={() => {
+        setScenario(scenario);
+        setCustomMode(false);
+        setCustomAssumptions(null);
+      }}
+      assumptions={assumptions}
+      onCustomChange={handleCustomChange}
+      showNetworkEffects={showNetworkEffects}
+      onToggleNetworkEffects={setShowNetworkEffects}
+      metcalfeCoefficient={metcalfeCoefficient}
+      onMetcalfeCoefficientChange={setMetcalfeCoefficient}
+      PRESETS={PRESETS}
+    />
+  </div>
+);
 }
