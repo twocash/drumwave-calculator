@@ -1,0 +1,779 @@
+{
+  "version": "1.0",
+  "last_updated": "2025-01-28",
+  "description": "Comprehensive registry of all adjustable variables in the DrumWave Walmart calculator",
+  "variables": [
+    {
+      "variable_name": "totalCustomers",
+      "label": "Total Customers",
+      "description": "Total addressable customer base eligible to participate in the data marketplace",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Executive Summary", "Standalone Model", "Details"],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "integer",
+      "default_values": {
+        "Low": 120000000,
+        "Base": 120000000,
+        "High": 120000000
+      },
+      "downstream_metrics_impacted": [
+        "Walmart Revenue",
+        "EBIT per Customer",
+        "Consumer Earnings",
+        "Active Cert Pool",
+        "Opted-In Customers"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object"
+    },
+    {
+      "variable_name": "dwalletAdoption",
+      "label": "dWallet Adoption Rate",
+      "description": "Percentage of customers who install and activate a digital wallet (dWallet) to participate",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Executive Summary", "Standalone Model", "Details"],
+      "currently_adjustable": true,
+      "control_type": "slider",
+      "data_type": "percent",
+      "range": {
+        "min": 0.28,
+        "max": 0.85,
+        "step": 0.01
+      },
+      "default_values": {
+        "Low": 0.50,
+        "Base": 0.70,
+        "High": 0.80
+      },
+      "downstream_metrics_impacted": [
+        "Effective Opt-In",
+        "Opted-In Customers",
+        "Walmart Revenue",
+        "Consumer Earnings",
+        "Active Cert Pool"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object, StandaloneView slider"
+    },
+    {
+      "variable_name": "activeConsent",
+      "label": "Active Consent Rate",
+      "description": "Of those with dWallets, the percentage who actively consent to share transaction data",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Executive Summary", "Details"],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "percent",
+      "default_values": {
+        "Low": 0.80,
+        "Base": 0.80,
+        "High": 0.85
+      },
+      "downstream_metrics_impacted": [
+        "Effective Opt-In",
+        "Opted-In Customers",
+        "Walmart Revenue",
+        "Consumer Earnings",
+        "Active Cert Pool"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object"
+    },
+    {
+      "variable_name": "effectiveOptIn",
+      "label": "Effective Opt-In Rate",
+      "description": "Combined adoption rate: dWallet Adoption × Active Consent",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Executive Summary", "Standalone Model", "Details"],
+      "currently_adjustable": false,
+      "control_type": "derived",
+      "data_type": "percent",
+      "formula": "dwalletAdoption × activeConsent",
+      "default_values": {
+        "Low": 0.40,
+        "Base": 0.56,
+        "High": 0.68
+      },
+      "downstream_metrics_impacted": [
+        "Opted-In Customers",
+        "Walmart Revenue",
+        "Consumer Earnings",
+        "Active Cert Pool"
+      ],
+      "file_reference": "src/App.jsx - calculated throughout"
+    },
+    {
+      "variable_name": "annualTransactions",
+      "label": "Transactions per Year",
+      "description": "Average number of shopping trips per customer annually",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Executive Summary", "Standalone Model", "Details"],
+      "currently_adjustable": true,
+      "control_type": "slider",
+      "data_type": "integer",
+      "range": {
+        "min": 50,
+        "max": 80,
+        "step": 1
+      },
+      "default_values": {
+        "Low": 55,
+        "Base": 65,
+        "High": 75
+      },
+      "downstream_metrics_impacted": [
+        "Certificates Minted",
+        "Active Cert Pool",
+        "Walmart Revenue",
+        "Consumer Earnings"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object, StandaloneView slider"
+    },
+    {
+      "variable_name": "brandStartPct",
+      "label": "Brand Participation - Start",
+      "description": "Initial percentage of brands participating in certificate creation at program launch",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Details"],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "percent",
+      "default_values": {
+        "Low": 0.05,
+        "Base": 0.05,
+        "High": 0.05
+      },
+      "downstream_metrics_impacted": [
+        "Brand Participation Curve",
+        "Certificates Minted",
+        "Active Cert Pool"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object"
+    },
+    {
+      "variable_name": "brandEndPct",
+      "label": "Brand Participation - End",
+      "description": "Target percentage of brands participating at full maturity",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Details"],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "percent",
+      "default_values": {
+        "Low": 1.0,
+        "Base": 1.0,
+        "High": 1.0
+      },
+      "downstream_metrics_impacted": [
+        "Brand Participation Curve",
+        "Certificates Minted",
+        "Active Cert Pool"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object"
+    },
+    {
+      "variable_name": "monthsToFull",
+      "label": "Brand Ramp Duration",
+      "description": "Number of months for brand participation to reach full maturity (sigmoid curve)",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Standalone Model", "Details"],
+      "currently_adjustable": true,
+      "control_type": "slider",
+      "data_type": "integer",
+      "range": {
+        "min": 18,
+        "max": 48,
+        "step": 6
+      },
+      "default_values": {
+        "Low": 36,
+        "Base": 36,
+        "High": 36
+      },
+      "downstream_metrics_impacted": [
+        "Brand Participation Curve",
+        "Certificates Minted",
+        "Active Cert Pool"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object, StandaloneView slider"
+    },
+    {
+      "variable_name": "itemFloor",
+      "label": "Eligible Items - Floor",
+      "description": "Minimum average number of certificate-eligible items per transaction at launch",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Details"],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "integer",
+      "default_values": {
+        "Low": 2,
+        "Base": 2,
+        "High": 3
+      },
+      "downstream_metrics_impacted": [
+        "Average Eligible Items",
+        "Certificates Minted",
+        "Active Cert Pool"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object"
+    },
+    {
+      "variable_name": "itemCeiling",
+      "label": "Eligible Items - Ceiling",
+      "description": "Maximum average number of certificate-eligible items per transaction at full maturity",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Details"],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "integer",
+      "default_values": {
+        "Low": 4,
+        "Base": 8,
+        "High": 8
+      },
+      "downstream_metrics_impacted": [
+        "Average Eligible Items",
+        "Certificates Minted",
+        "Active Cert Pool"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object"
+    },
+    {
+      "variable_name": "mintingFee",
+      "label": "Certificate Minting Fee",
+      "description": "Fee per certificate created when a shopper purchases a branded product",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Details"],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "dollars",
+      "default_values": {
+        "Low": 0.10,
+        "Base": 0.10,
+        "High": 0.10
+      },
+      "downstream_metrics_impacted": [
+        "Minting Revenue",
+        "Walmart Revenue",
+        "Consumer Earnings"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object"
+    },
+    {
+      "variable_name": "licenseFee",
+      "label": "Consented Re-Use License Fee",
+      "description": "Fee brands pay each time they access consented shopper data via a certificate",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Standalone Model", "Details"],
+      "currently_adjustable": true,
+      "control_type": "slider",
+      "data_type": "dollars",
+      "range": {
+        "min": 0.100,
+        "max": 0.200,
+        "step": 0.005
+      },
+      "default_values": {
+        "Low": 0.150,
+        "Base": 0.175,
+        "High": 0.200
+      },
+      "downstream_metrics_impacted": [
+        "Licensing Revenue",
+        "Walmart Revenue",
+        "Consumer Earnings",
+        "Brand Revenue"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object, StandaloneView slider"
+    },
+    {
+      "variable_name": "usesPerCertPerYear",
+      "label": "Reuse Rate",
+      "description": "Average number of times brands access each certificate annually for remarketing",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Standalone Model", "Details"],
+      "currently_adjustable": true,
+      "control_type": "slider",
+      "data_type": "multiplier",
+      "range": {
+        "min": 2,
+        "max": 6,
+        "step": 0.5
+      },
+      "default_values": {
+        "Low": 3,
+        "Base": 4,
+        "High": 6
+      },
+      "downstream_metrics_impacted": [
+        "Licensing Revenue",
+        "Walmart Revenue",
+        "Consumer Earnings",
+        "Brand Revenue"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object, StandaloneView slider"
+    },
+    {
+      "variable_name": "royaltyMargin",
+      "label": "Royalty Margin",
+      "description": "Walmart's take-rate on gross revenue before operating costs (EBIT proxy)",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Standalone Model", "Details"],
+      "currently_adjustable": true,
+      "control_type": "slider",
+      "data_type": "percent",
+      "range": {
+        "min": 0.50,
+        "max": 0.95,
+        "step": 0.05
+      },
+      "default_values": {
+        "Low": 0.95,
+        "Base": 0.95,
+        "High": 0.95
+      },
+      "downstream_metrics_impacted": [
+        "EBIT per Customer"
+      ],
+      "file_reference": "src/App.jsx - PRESETS object, StandaloneView slider"
+    },
+    {
+      "variable_name": "showNetworkEffects",
+      "label": "Network Effects Toggle",
+      "description": "Enables/disables display of network effects on Executive Summary dashboard",
+      "scope": "Network Model",
+      "appears_in_tabs": ["Executive Summary"],
+      "currently_adjustable": true,
+      "control_type": "checkbox",
+      "data_type": "boolean",
+      "default_values": {
+        "all": false
+      },
+      "downstream_metrics_impacted": [
+        "Walmart Revenue (multiplied)",
+        "Consumer Earnings (multiplied)",
+        "Active Cert Pool (multiplied)"
+      ],
+      "file_reference": "src/App.jsx - DashboardView toggle"
+    },
+    {
+      "variable_name": "networkSize",
+      "label": "Network Size",
+      "description": "Number of retailers in the simplified network multiplier model (legacy)",
+      "scope": "Network Model",
+      "appears_in_tabs": [],
+      "currently_adjustable": false,
+      "control_type": "deprecated",
+      "data_type": "integer",
+      "default_values": {
+        "all": 1
+      },
+      "downstream_metrics_impacted": [],
+      "file_reference": "src/App.jsx - state variable (unused in current UI)"
+    },
+    {
+      "variable_name": "metcalfeCoefficient",
+      "label": "Network Coefficient (k)",
+      "description": "Metcalfe's Law coefficient determining how network size amplifies license fee pricing",
+      "scope": "Network Model",
+      "appears_in_tabs": ["Network Effects"],
+      "currently_adjustable": true,
+      "control_type": "slider",
+      "data_type": "multiplier",
+      "range": {
+        "min": 0.1,
+        "max": 1.0,
+        "step": 0.05
+      },
+      "default_values": {
+        "all": 0.5
+      },
+      "downstream_metrics_impacted": [
+        "Network Multiplier",
+        "License Fee (network-adjusted)",
+        "Walmart Revenue (network scenario)",
+        "Consumer Earnings (network scenario)"
+      ],
+      "file_reference": "src/App.jsx - NetworkView slider, calculateMetcalfeValue function"
+    },
+    {
+      "variable_name": "retailerName",
+      "label": "Retailer Name",
+      "description": "Display name for a retailer in the multi-retailer network configuration",
+      "scope": "Per Retailer",
+      "appears_in_tabs": ["Network Effects"],
+      "currently_adjustable": true,
+      "control_type": "text input",
+      "data_type": "string",
+      "default_values": {
+        "walmart": "Walmart",
+        "target": "Target",
+        "kroger": "Kroger",
+        "cvs": "CVS",
+        "costco": "Costco"
+      },
+      "downstream_metrics_impacted": [],
+      "file_reference": "src/App.jsx - DEFAULT_RETAILERS, NetworkView config panel"
+    },
+    {
+      "variable_name": "retailer_totalCustomers",
+      "label": "Customers (M)",
+      "description": "Total customer base for a specific retailer in millions",
+      "scope": "Per Retailer",
+      "appears_in_tabs": ["Network Effects"],
+      "currently_adjustable": true,
+      "control_type": "number input",
+      "data_type": "integer",
+      "default_values": {
+        "walmart": 120000000,
+        "target": 75000000,
+        "kroger": 60000000,
+        "cvs": 90000000,
+        "costco": 65000000
+      },
+      "downstream_metrics_impacted": [
+        "Retailer Certificate Volume",
+        "Aggregate Network Pool",
+        "Network Revenue"
+      ],
+      "file_reference": "src/App.jsx - DEFAULT_RETAILERS, NetworkView config panel"
+    },
+    {
+      "variable_name": "retailer_adoptionRate",
+      "label": "Adoption Rate (%)",
+      "description": "Effective opt-in rate (dWallet × Consent) for a specific retailer",
+      "scope": "Per Retailer",
+      "appears_in_tabs": ["Network Effects"],
+      "currently_adjustable": true,
+      "control_type": "number input",
+      "data_type": "percent",
+      "default_values": {
+        "walmart": 0.56,
+        "target": 0.4875,
+        "kroger": 0.42,
+        "cvs": 0.374,
+        "costco": 0.5304
+      },
+      "downstream_metrics_impacted": [
+        "Retailer Certificate Volume",
+        "Aggregate Network Pool",
+        "Network Revenue"
+      ],
+      "file_reference": "src/App.jsx - DEFAULT_RETAILERS (derived from dwalletAdoption × activeConsent), NetworkView config panel"
+    },
+    {
+      "variable_name": "retailer_annualTransactions",
+      "label": "Transactions/Year",
+      "description": "Average annual shopping trips for a specific retailer",
+      "scope": "Per Retailer",
+      "appears_in_tabs": ["Network Effects"],
+      "currently_adjustable": true,
+      "control_type": "number input",
+      "data_type": "integer",
+      "default_values": {
+        "walmart": 65,
+        "target": 48,
+        "kroger": 52,
+        "cvs": 38,
+        "costco": 28
+      },
+      "downstream_metrics_impacted": [
+        "Retailer Certificate Volume",
+        "Aggregate Network Pool",
+        "Network Revenue"
+      ],
+      "file_reference": "src/App.jsx - DEFAULT_RETAILERS, NetworkView config panel"
+    },
+    {
+      "variable_name": "retailer_launchMonth",
+      "label": "Launch Month",
+      "description": "Month when retailer joins the network (0 = from start, 12 = year 2, etc.)",
+      "scope": "Per Retailer",
+      "appears_in_tabs": ["Network Effects"],
+      "currently_adjustable": true,
+      "control_type": "number input",
+      "data_type": "integer",
+      "range": {
+        "min": 0,
+        "max": 35
+      },
+      "default_values": {
+        "walmart": 0,
+        "target": 6,
+        "kroger": 12,
+        "cvs": 18,
+        "costco": 24
+      },
+      "downstream_metrics_impacted": [
+        "Network Multiplier Growth",
+        "Phased Revenue Rollout",
+        "Aggregate Network Pool"
+      ],
+      "file_reference": "src/App.jsx - DEFAULT_RETAILERS, NetworkView config panel"
+    },
+    {
+      "variable_name": "retailer_brandStartPct",
+      "label": "Brand Start %",
+      "description": "Initial brand participation rate for specific retailer",
+      "scope": "Per Retailer",
+      "appears_in_tabs": [],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "percent",
+      "default_values": {
+        "walmart": 0.05,
+        "target": 0.08,
+        "kroger": 0.10,
+        "cvs": 0.12,
+        "costco": 0.08
+      },
+      "downstream_metrics_impacted": [
+        "Retailer Certificate Volume"
+      ],
+      "file_reference": "src/App.jsx - DEFAULT_RETAILERS"
+    },
+    {
+      "variable_name": "retailer_brandEndPct",
+      "label": "Brand End %",
+      "description": "Target brand participation rate for specific retailer",
+      "scope": "Per Retailer",
+      "appears_in_tabs": [],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "percent",
+      "default_values": {
+        "walmart": 1.0,
+        "target": 1.0,
+        "kroger": 1.0,
+        "cvs": 1.0,
+        "costco": 1.0
+      },
+      "downstream_metrics_impacted": [
+        "Retailer Certificate Volume"
+      ],
+      "file_reference": "src/App.jsx - DEFAULT_RETAILERS"
+    },
+    {
+      "variable_name": "retailer_monthsToFull",
+      "label": "Months to Full",
+      "description": "Brand ramp duration for specific retailer",
+      "scope": "Per Retailer",
+      "appears_in_tabs": [],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "integer",
+      "default_values": {
+        "walmart": 36,
+        "target": 30,
+        "kroger": 24,
+        "cvs": 24,
+        "costco": 24
+      },
+      "downstream_metrics_impacted": [
+        "Retailer Certificate Volume"
+      ],
+      "file_reference": "src/App.jsx - DEFAULT_RETAILERS"
+    },
+    {
+      "variable_name": "retailer_itemFloor",
+      "label": "Item Floor",
+      "description": "Minimum eligible items per transaction for specific retailer",
+      "scope": "Per Retailer",
+      "appears_in_tabs": [],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "integer",
+      "default_values": {
+        "walmart": 2,
+        "target": 2,
+        "kroger": 2,
+        "cvs": 1,
+        "costco": 3
+      },
+      "downstream_metrics_impacted": [
+        "Retailer Certificate Volume"
+      ],
+      "file_reference": "src/App.jsx - DEFAULT_RETAILERS"
+    },
+    {
+      "variable_name": "retailer_itemCeiling",
+      "label": "Item Ceiling",
+      "description": "Maximum eligible items per transaction for specific retailer",
+      "scope": "Per Retailer",
+      "appears_in_tabs": [],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "integer",
+      "default_values": {
+        "walmart": 8,
+        "target": 7,
+        "kroger": 6,
+        "cvs": 5,
+        "costco": 10
+      },
+      "downstream_metrics_impacted": [
+        "Retailer Certificate Volume"
+      ],
+      "file_reference": "src/App.jsx - DEFAULT_RETAILERS"
+    },
+    {
+      "variable_name": "retailer_color",
+      "label": "Chart Color",
+      "description": "Brand color for visualizing retailer in charts and graphs",
+      "scope": "Per Retailer",
+      "appears_in_tabs": ["Network Effects"],
+      "currently_adjustable": false,
+      "control_type": "fixed",
+      "data_type": "hex color",
+      "default_values": {
+        "walmart": "#0071CE",
+        "target": "#CC0000",
+        "kroger": "#003DA5",
+        "cvs": "#E87722",
+        "costco": "#0066B2"
+      },
+      "downstream_metrics_impacted": [],
+      "file_reference": "src/App.jsx - DEFAULT_RETAILERS"
+    },
+    {
+      "variable_name": "bankShare",
+      "label": "Bank Share",
+      "description": "Share paid to the issuing bank or payments partner for running card-linked credits.",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Details"],
+      "currently_adjustable": true,
+      "control_type": "slider",
+      "data_type": "percent",
+      "category": "advanced",
+      "section": "Cost Structure",
+      "range": {
+        "min": 0,
+        "max": 0.05,
+        "step": 0.005
+      },
+      "default_values": {
+        "Low": 0.02,
+        "Base": 0.02,
+        "High": 0.02
+      },
+      "downstream_metrics_impacted": [
+        "Operating Costs",
+        "EBIT",
+        "EBIT Margin"
+      ],
+      "file_reference": "src/App.jsx - EBIT calculation block"
+    },
+    {
+      "variable_name": "dataAgentShare",
+      "label": "DrumWave Share",
+      "description": "Portion of revenue paid to DrumWave for providing the shopper data marketplace and managing certificate issuance.",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Details"],
+      "currently_adjustable": true,
+      "control_type": "slider",
+      "data_type": "percent",
+      "category": "advanced",
+      "section": "Cost Structure",
+      "range": {
+        "min": 0,
+        "max": 0.05,
+        "step": 0.005
+      },
+      "default_values": {
+        "Low": 0.02,
+        "Base": 0.02,
+        "High": 0.02
+      },
+      "downstream_metrics_impacted": [
+        "Operating Costs",
+        "EBIT",
+        "EBIT Margin"
+      ],
+      "file_reference": "src/App.jsx - EBIT calculation block"
+    },
+    {
+      "variable_name": "platformFee",
+      "label": "Operating Overhead",
+      "description": "Walmart's internal technology and operational costs to support marketplace integration.",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Details"],
+      "currently_adjustable": true,
+      "control_type": "slider",
+      "data_type": "percent",
+      "category": "advanced",
+      "section": "Cost Structure",
+      "range": {
+        "min": 0,
+        "max": 0.1,
+        "step": 0.005
+      },
+      "default_values": {
+        "Low": 0.05,
+        "Base": 0.05,
+        "High": 0.05
+      },
+      "downstream_metrics_impacted": [
+        "Operating Costs",
+        "EBIT",
+        "EBIT Margin"
+      ],
+      "file_reference": "src/App.jsx - EBIT calculation block"
+    },
+    {
+      "variable_name": "sgaOverhead",
+      "label": "SG&A Overhead",
+      "description": "Sales, marketing, and administrative support for scaling the program.",
+      "scope": "Walmart-only",
+      "appears_in_tabs": ["Details"],
+      "currently_adjustable": true,
+      "control_type": "slider",
+      "data_type": "percent",
+      "category": "advanced",
+      "section": "Cost Structure",
+      "range": {
+        "min": 0,
+        "max": 0.1,
+        "step": 0.005
+      },
+      "default_values": {
+        "Low": 0.04,
+        "Base": 0.04,
+        "High": 0.04
+      },
+      "downstream_metrics_impacted": [
+        "Operating Costs",
+        "EBIT",
+        "EBIT Margin"
+      ],
+      "file_reference": "src/App.jsx - EBIT calculation block"
+    }
+  ],
+  "naming_collisions": [
+    {
+      "issue": "Adoption Rate Inconsistency",
+      "variables_affected": ["dwalletAdoption", "retailer_adoptionRate"],
+      "description": "Standalone Model uses 'dwalletAdoption' (a component of effectiveOptIn), while Network Effects config shows 'Adoption Rate (%)' as the COMBINED metric (dwalletAdoption × activeConsent). This creates confusion.",
+      "canonical_suggestion": "Use 'effectiveOptIn' or 'participationRate' consistently across all tabs. Display it as 'Adoption Rate' in UI."
+    },
+    {
+      "issue": "Transaction Terminology",
+      "variables_affected": ["annualTransactions"],
+      "description": "Variable is named 'annualTransactions' but labeled as 'Transactions/Year' - semantically identical but inconsistent naming pattern.",
+      "canonical_suggestion": "Standardize on either 'annualTransactions' or 'transactionsPerYear' throughout codebase."
+    },
+    {
+      "issue": "Retailer-Specific vs Walmart-Specific Variables",
+      "variables_affected": ["retailer_totalCustomers vs totalCustomers", "retailer_adoptionRate vs dwalletAdoption", "retailer_annualTransactions vs annualTransactions"],
+      "description": "The same concepts (customers, adoption, transactions) are represented with different variable names depending on whether they're Walmart-specific or multi-retailer. This is necessary but could benefit from clearer namespacing.",
+      "canonical_suggestion": "Consider explicit 'walmart_' prefix for Walmart-specific variables OR use a config object structure like 'retailerConfig.walmart.totalCustomers'."
+    }
+  ],
+  "analysis_notes": [
+    "13 core variables control Walmart standalone scenario (totalCustomers through royaltyMargin)",
+    "2 network effect toggles (showNetworkEffects, metcalfeCoefficient)",
+    "11 per-retailer configuration variables (name, customers, adoption, etc.)",
+    "Only 8 variables currently have UI controls in Standalone tab: dwalletAdoption, annualTransactions, monthsToFull, licenseFee, usesPerCertPerYear, royaltyMargin, plus the scenario selector",
+    "Network Effects tab exposes 4 retailer properties via config panel: Customers (M), Adoption Rate (%), Transactions/Year, Launch Month",
+    "Several high-impact variables are currently FIXED across scenarios: mintingFee ($0.10), activeConsent (80-85%), totalCustomers (120M)",
+    "Royalty Margin is adjustable but has NO impact on most KPIs - only affects 'EBIT per Customer' calculation"
+  ]
+}
