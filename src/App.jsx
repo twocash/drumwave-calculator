@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ConfigurationFlyout from './components/ConfigurationFlyout'; // added in phase 3
 import KpiStrip from './components/KpiStrip'; // added in Step 5
+import HowItWorksModal from './components/HowItWorksModal'; // explainer modal
 
 // ==================== CALCULATION ENGINE ====================
 
@@ -359,7 +360,7 @@ function calculateRetailerResultsV2(retailer, month, mintingHistory, mintingFee,
   
   // PROPER 12-month rolling window certificate pool
   // Calculate pool from history + current month, minus expired (month-13)
-  const expiredCerts = mintingHistory.length > 12 ? mintingHistory[mintingHistory.length - 13] : 0;
+  const expiredCerts = mintingHistory.length >= 12 ? mintingHistory[mintingHistory.length - 12] : 0;
   const activeCertPool = mintingHistory.reduce((sum, val) => sum + (val || 0), 0) + certsMintedThisMonth - expiredCerts;
   
   // Minting revenue (no network effect on minting)
@@ -493,6 +494,18 @@ export default function DrumWaveWalmartTool() {
   const [metcalfeCoefficient, setMetcalfeCoefficient] = useState(0.5);
   const [showRetailerConfig, setShowRetailerConfig] = useState(false);
   const [showConfigFlyout, setShowConfigFlyout] = useState(false);
+  
+  // How It Works modal state
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+
+  // Auto-show explainer on first visit
+  useEffect(() => {
+    const hasSeenExplainer = localStorage.getItem('drumwave_has_seen_explainer');
+    if (!hasSeenExplainer) {
+      setShowHowItWorks(true);
+      localStorage.setItem('drumwave_has_seen_explainer', 'true');
+    }
+  }, []);
 
 
   const assumptions = customMode && customAssumptions ? customAssumptions : PRESETS[scenario];
@@ -1889,7 +1902,38 @@ return (
           </div>
 
           {/* Configuration button */}
-          <div style={{ padding: '0.5rem 1rem' }}>
+          <div style={{ padding: '0.5rem 1rem', display: 'flex', gap: '0.75rem' }}>
+            {/* How It Works button */}
+            <button
+              onClick={() => setShowHowItWorks(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.25rem',
+                fontSize: '0.9375rem',
+                fontWeight: '600',
+                color: '#0071CE',
+                background: 'white',
+                border: '2px solid #0071CE',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#f0f7ff';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'white';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+              title="Learn how the DrumWave model works"
+            >
+              <span style={{ fontSize: '1.25rem' }}>💡</span>
+              <span>How It Works</span>
+            </button>
+            
             <button
               onClick={() => setShowConfigFlyout(true)}
               style={{
@@ -1960,6 +2004,13 @@ return (
       metcalfeCoefficient={metcalfeCoefficient}
       onMetcalfeCoefficientChange={setMetcalfeCoefficient}
       PRESETS={PRESETS}
+    />
+    
+    {/* How It Works Modal - Carousel explainer */}
+    <HowItWorksModal
+      isOpen={showHowItWorks}
+      onClose={() => setShowHowItWorks(false)}
+      carouselPath="/drumwave_carousel.html"
     />
   </div>
 );
