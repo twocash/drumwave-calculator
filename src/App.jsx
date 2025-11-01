@@ -3,6 +3,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 import ConfigurationFlyout from './components/ConfigurationFlyout'; // added in phase 3
 import KpiStrip from './components/KpiStrip'; // added in Step 5
 import HowItWorksModal from './components/HowItWorksModal'; // explainer modal
+import StatusBar from './components/StatusBar'; // dynamic status bar component
 
 // ==================== CALCULATION ENGINE ====================
 
@@ -107,65 +108,6 @@ function calculateMonthlyResults(assumptions) {
   }
 
   return results;
-}
-
-// Network effects multipliers
-
-function calculateReuseMultiplier(numRetailers, baseReuse = 4) {
-  const reuseIncrease = 0.4;
-  const maxReuse = 8;
-  const newReuse = baseReuse * (1 + (numRetailers - 1) * reuseIncrease);
-  return Math.min(newReuse, maxReuse) / baseReuse;
-}
-
-function calculateAdoptionLift(numRetailers, baseAdoption) {
-  const liftPerRetailer = 0.04;
-  const maxAdoption = 0.85;
-  const newAdoption = baseAdoption + (numRetailers - 1) * liftPerRetailer;
-  return Math.min(newAdoption, maxAdoption);
-}
-
-function calculatePricePremium(numRetailers) {
-  const premiumPerRetailer = 0.12;
-  const maxPremium = 0.50;
-  const premium = (numRetailers - 1) * premiumPerRetailer;
-  return 1 + Math.min(premium, maxPremium);
-}
-
-// Calculate network scenario
-function calculateNetworkScenario(singleRetailerResults, numRetailers, baseAdoption) {
-  const reuseMultiplier = calculateReuseMultiplier(numRetailers, 4);
-  const adoptionLift = calculateAdoptionLift(numRetailers, baseAdoption);
-  const pricePremium = calculatePricePremium(numRetailers);
-  const adoptionFactor = adoptionLift / baseAdoption;
-
-  return singleRetailerResults.map((month, index) => {
-    // Minting revenue grows ONLY with adoption lift
-    // (More Walmart shoppers opt in → more certificates minted)
-    const newMintingRevenue = month.retailerMintingRevenue * adoptionFactor;
-    
-    // Licensing revenue grows with THREE multipliers:
-    // 1. Adoption (more Walmart certificates in pool)
-    // 2. Reuse (each certificate used more often)
-    // 3. Price (brands pay more per use)
-    // NOTE: NO pool growth multiplier (Walmart doesn't benefit from Target's pool)
-    const newLicensingRevenue = month.retailerLicensing * 
-                                 adoptionFactor *      // More Walmart shoppers
-                                 reuseMultiplier *     // More uses per Walmart cert
-                                 pricePremium;         // Higher price per use
-    
-    return {
-      month: index + 1,
-      retailerTotal: newMintingRevenue + newLicensingRevenue,
-      mintingComponent: newMintingRevenue,
-      licensingComponent: newLicensingRevenue,
-      // Certificate pool only grows from adoption lift (more Walmart shoppers)
-      activeCertPool: month.activeCertPool * adoptionFactor,
-      // Consumer earnings increase with same multipliers
-      consumerTotal: (month.consumerMintingBenefit + month.consumerLicensing) * 
-                     adoptionFactor * reuseMultiplier * pricePremium
-    };
-  });
 }
 
 // Preset scenarios
@@ -526,11 +468,6 @@ export default function DrumWaveWalmartTool() {
     () => calculateMonthlyResults(PRESETS.High),
     []
   );
-
-  const networkResults = useMemo(
-    () => calculateNetworkScenario(singleRetailerResults, networkSize, effectiveOptIn),
-    [singleRetailerResults, networkSize, effectiveOptIn]
-  );
   
   // Apply scenario assumptions to Walmart retailer
   // Other retailers keep their configured values
@@ -732,56 +669,36 @@ export default function DrumWaveWalmartTool() {
           <p className="text-xl text-gray-600 font-semibold">Shopper Data Marketplace 36-Month Projection</p>
         </div>
 
-        {/* Scenario Selection - Prominent Control Panel */}
-        <div className="control-panel">
-          <div className="text-center mb-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Select Model Scenario</h2>
-            <p className="text-sm text-gray-600">Choose market conditions to model skeptical, realistic, or enthusiastic adoption</p>
-          </div>
-          
-          <div className="flex justify-center gap-4 mb-6">
-            {['Low', 'Base', 'High'].map((preset) => (
-              <button
-                key={preset}
-                onClick={() => handlePresetClick(preset)}
-                className={`scenario-button ${
-                  scenario === preset && !customMode ? 'active' : 'inactive'
-                }`}
-              >
-                {preset}
-              </button>
-            ))}
-          </div>
+        {/* Status Bar */}
+        <StatusBar 
+          scenario={scenario}
+          customMode={customMode}
+          assumptions={assumptions}
+          showNetworkEffects={showNetworkEffects}
+          onNetworkEffectsToggle={() => setShowNetworkEffects(!showNetworkEffects)}
+          onOpenConfiguration={() => setShowConfigFlyout(true)}
+          standaloneRevenue={cumulativeRetailer}
+          networkRevenue={displayCumulativeRetailer}
+        />
 
-          {/* Network Effects Toggle */}
-          <div className="network-toggle-container">
-            <label className="network-toggle-label">
-              <input
-                type="checkbox"
-                checked={showNetworkEffects}
-                onChange={(e) => {
-                  setShowNetworkEffects(e.target.checked);
-                }}
-                className="network-toggle-checkbox"
-              />
-              <span>Show Network Effects (5 Retailers, Phased Rollout)</span>
-            </label>
-            {showNetworkEffects && (
-              <div className="text-sm text-gray-600 mt-2 text-center">
-                Showing Walmart's revenue with full 5-retailer network effects (Metcalfe's Law)
+        {/* Show Network Effects Notice if enabled */}
+        {showNetworkEffects && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <span className="text-blue-600 mr-2">ℹ️</span>
+              <div>
+                <p className="text-sm text-blue-900 font-semibold mb-1">
+                  Show Network Effects (5 Retailers, Phased Rollout)
+                </p>
+                <p className="text-sm text-blue-800">
+                  Current model: {scenario}. Realistic adoption (70% DWallet, 80% consent) 
+                  with 5.0 certificates per trip from branded products across categories.
+                  Edit assumptions in Configuration.
+                </p>
               </div>
-            )}
+            </div>
           </div>
-
-          {/* Scenario Summary */}
-          <div className="mt-4 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-600">
-            <p className="text-sm text-gray-700">
-              <strong>Current model: {customMode ? 'Custom' : scenario}.</strong> 
-              {' '}{getScenarioDescription(scenario, avgCertsPerTrip, assumptions)} 
-              {' '}Edit assumptions in Configuration.
-            </p>
-          </div>
-        </div>
+        )}
 
         {/* KPI Strip - Executive Summary Metrics */}
         <KpiStrip
@@ -2000,7 +1917,7 @@ return (
       assumptions={assumptions}
       onCustomChange={handleCustomChange}
       showNetworkEffects={showNetworkEffects}
-      onToggleNetworkEffects={setShowNetworkEffects}
+      onNetworkEffectsToggle={setShowNetworkEffects}
       metcalfeCoefficient={metcalfeCoefficient}
       onMetcalfeCoefficientChange={setMetcalfeCoefficient}
       PRESETS={PRESETS}

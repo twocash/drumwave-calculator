@@ -30,7 +30,7 @@ export default function ConfigurationFlyout({
   
   // Network effects
   showNetworkEffects,
-  onToggleNetworkEffects,
+  onNetworkEffectsToggle,
   metcalfeCoefficient,
   onMetcalfeCoefficientChange,
   
@@ -435,35 +435,53 @@ export default function ConfigurationFlyout({
               NETWORK EFFECTS
             </h3>
 
-            {/* Network Effects Toggle */}
+            {/* Network Effects Toggle - Synchronized with main dashboard */}
             <div style={{
-              padding: '1rem',
+              padding: '0.75rem',
               backgroundColor: '#f8fafc',
-              borderRadius: '0.5rem',
+              borderRadius: '0.375rem',
               marginBottom: '1rem'
             }}>
-              <label style={{
+              <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.75rem',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#334155'
+                justifyContent: 'space-between',
+                marginBottom: '0.5rem'
               }}>
-                <input
-                  type="checkbox"
-                  checked={showNetworkEffects}
-                  onChange={(e) => onToggleNetworkEffects(e.target.checked)}
-                  style={{
-                    width: '1.25rem',
-                    height: '1.25rem',
-                    cursor: 'pointer',
-                    accentColor: '#2563eb'
-                  }}
-                />
-                <span>Show Network Effects (5 Retailers)</span>
-              </label>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={showNetworkEffects}
+                    onChange={() => onNetworkEffectsToggle(!showNetworkEffects)}
+                    style={{
+                      width: '1.25rem',
+                      height: '1.25rem',
+                      marginRight: '0.75rem',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  <span style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#334155'
+                  }}>
+                    Enable Network Effects
+                  </span>
+                </label>
+              </div>
+              <p style={{
+                fontSize: '0.75rem',
+                color: '#64748b',
+                marginLeft: '2rem'
+              }}>
+                {showNetworkEffects 
+                  ? 'Enabled: Showing Walmart\'s revenue with full 5-retailer network effects (Metcalfe\'s Law)'
+                  : 'None: Walmart Standalone'}
+              </p>
             </div>
 
             {/* Network Coefficient (k-value) */}
