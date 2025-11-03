@@ -58,7 +58,7 @@ function calculateMonthlyResults(assumptions) {
     cumulativeCertsMinted += certsMintedThisMonth;
     
     // Certificate pool (12-month rolling window)
-    const expiredCerts = month > 12 ? mintingHistory[month - 13] : 0;
+    const expiredCerts = month >= 12 ? mintingHistory[month - 12] : 0;
     activeCertPool = activeCertPool + certsMintedThisMonth - expiredCerts;
     
     // Minting revenue
