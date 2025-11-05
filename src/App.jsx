@@ -675,7 +675,7 @@ export default function DrumWaveWalmartTool() {
         {/* Narrative Strip - FIRST ELEMENT */}
         <div className="narrative-strip">
           <h2 className="narrative-strip__headline">
-            DrumWave turns consented shopper data into <span className="narrative-strip__value">${(results.walmartAnnualizedRevenue / 1_000_000_000).toFixed(1)}B+</span> in annualized incremental profit — while rewarding <span className="narrative-strip__value">{Math.round(results.optedInCustomers / 1_000_000)}M</span> customers.
+            DrumWave turns consented shopper data into <span className="narrative-strip__value">${(results.walmartAnnualizedRevenue / 1_000_000_000).toFixed(1)}B+</span> in annualized incremental profit for Walmart — while rewarding <span className="narrative-strip__value">{Math.round(results.optedInCustomers / 1_000_000)}M</span> customers.
           </h2>
           <p className="narrative-strip__subtitle">
             Live 36-month projection based on {Math.round(assumptions.dwalletAdoption * assumptions.activeConsent * 100)}% opt-in, {assumptions.annualTransactions} transactions/year, {results.brandReuseRate || 4}× reuse rate.
