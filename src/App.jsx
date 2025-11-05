@@ -2,8 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ConfigurationFlyout from './components/ConfigurationFlyout'; // added in phase 3
 import KpiStrip from './components/KpiStrip'; // added in Step 5
+import ExecutiveSummary from './components/ExecutiveSummary'; // NEW - Executive Summary UI v2
 import HowItWorksModal from './components/HowItWorksModal'; // explainer modal
 import StatusBar from './components/StatusBar'; // dynamic status bar component
+
+// ==================== FEATURE FLAGS ====================
+const USE_NEW_EXECUTIVE_SUMMARY = true; // Toggle for new Executive Summary UI
 
 // ==================== CALCULATION ENGINE ====================
 
@@ -623,7 +627,7 @@ export default function DrumWaveWalmartTool() {
     // Round once for display consistency
     const networkLiftDisplayPercent = parseFloat(networkLiftRaw.toFixed(1));
     
-    // Build a `results` bundle for KpiStrip
+    // Build a `results` bundle for KpiStrip and ExecutiveSummary
     const results = {
       walmartAnnualizedRevenue,
       walmartEbitAnnualized,
@@ -633,7 +637,13 @@ export default function DrumWaveWalmartTool() {
       networkLiftDisplayPercent,
       standaloneCumulativeRevenue,
       networkCumulativeRevenue,
-      showNetworkEffects
+      showNetworkEffects,
+      // Additional data for ExecutiveSummary
+      walmart36MonthRevenue: displayCumulativeRetailer, // 36-month total
+      consumer36MonthEarnings: displayCumulativeConsumer, // 36-month total
+      walmart36MonthEbit: (displayCumulativeRetailer * grossRoyaltyMargin) - (displayCumulativeRetailer * (bankShare + dataAgentShare + platformFee + sgaOverhead)), // 36-month EBIT
+      activeCertificatePool: showNetworkEffects ? displayActiveCerts : month36.activeCertPool,
+      brandReuseRate: assumptions.usesPerCertPerYear || 4.2 // Use actual reuse rate from assumptions
     };
     
     // --- END EBIT / REVENUE ROLLUP BLOCK ---
@@ -662,14 +672,17 @@ export default function DrumWaveWalmartTool() {
     
     return (
       <div className="space-y-8">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-3" style={{ letterSpacing: '-0.02em' }}>
-            Walmart x DrumWave: Economic Model
-          </h1>
-          <p className="text-xl text-gray-600 font-semibold">Shopper Data Marketplace 36-Month Projection</p>
+        {/* Narrative Strip - FIRST ELEMENT */}
+        <div className="narrative-strip">
+          <h2 className="narrative-strip__headline">
+            DrumWave turns consented shopper data into <span className="narrative-strip__value">${(results.walmartAnnualizedRevenue / 1_000_000_000).toFixed(1)}B+</span> in annualized incremental profit — while rewarding <span className="narrative-strip__value">{Math.round(results.optedInCustomers / 1_000_000)}M</span> customers.
+          </h2>
+          <p className="narrative-strip__subtitle">
+            Live 36-month projection based on {Math.round(assumptions.dwalletAdoption * assumptions.activeConsent * 100)}% opt-in, {assumptions.annualTransactions} transactions/year, {results.brandReuseRate || 4}× reuse rate.
+          </p>
         </div>
 
-        {/* Status Bar */}
+        {/* Status Bar (Scenario Info Box) */}
         <StatusBar 
           scenario={scenario}
           customMode={customMode}
@@ -681,26 +694,7 @@ export default function DrumWaveWalmartTool() {
           networkRevenue={displayCumulativeRetailer}
         />
 
-        {/* Show Network Effects Notice if enabled */}
-        {showNetworkEffects && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start">
-              <span className="text-blue-600 mr-2">ℹ️</span>
-              <div>
-                <p className="text-sm text-blue-900 font-semibold mb-1">
-                  Show Network Effects (5 Retailers, Phased Rollout)
-                </p>
-                <p className="text-sm text-blue-800">
-                  Current model: {scenario}. Realistic adoption (70% DWallet, 80% consent) 
-                  with 5.0 certificates per trip from branded products across categories.
-                  Edit assumptions in Configuration.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* KPI Strip - Executive Summary Metrics */}
+        {/* KPI Strip - Keep the Original */}
         <KpiStrip
           walmartRevenue={results.walmartAnnualizedRevenue}
           walmartEbit={results.walmartEbitAnnualized}
@@ -710,110 +704,105 @@ export default function DrumWaveWalmartTool() {
           showNetworkEffects={results.showNetworkEffects}
         />
 
-        {/* Scorecards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-          <div className="scorecard">
-            <div className="scorecard-label">WALMART REVENUE</div>
-            <div className="scorecard-value">{formatCurrency(displayCumulativeRetailer)}</div>
-            <div className="scorecard-subtitle">36-Month Total</div>
-            {showNetworkEffects && (
-              <div className="scorecard-badge">
-                {(displayCumulativeRetailer / cumulativeRetailer).toFixed(1)}× baseline
-              </div>
-            )}
-          </div>
-
-          <div className="scorecard">
-            <div className="scorecard-label">EBIT PER CUSTOMER</div>
-            <div className="scorecard-value">
-              ${((results.walmartEbitAnnualized * 3) / results.optedInCustomers).toFixed(2)}
+        {/* Executive Summary (Replaces Scorecards) - Conditionally render new or old version */}
+        {USE_NEW_EXECUTIVE_SUMMARY ? (
+          <ExecutiveSummary
+            walmartRevenue={results.walmartAnnualizedRevenue}
+            walmart36MonthRevenue={results.walmart36MonthRevenue}
+            consumerEarningsTotal={results.consumer36MonthEarnings}
+            activeCertificatePool={results.activeCertificatePool}
+            optedInCustomers={results.optedInCustomers}
+            walmartEbit={results.walmartEbitAnnualized}
+            walmart36MonthEbit={results.walmart36MonthEbit}
+            brandReuseRate={results.brandReuseRate}
+            showNetworkEffects={results.showNetworkEffects}
+            scenarioName={scenario}
+            onExploreStandalone={() => setActiveView('standalone')}
+            onSeeNetworkEffects={() => setActiveView('network')}
+          />
+        ) : (
+          /* Original Scorecards Grid */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+            <div className="scorecard">
+              <div className="scorecard-label">WALMART REVENUE</div>
+              <div className="scorecard-value">{formatCurrency(displayCumulativeRetailer)}</div>
+              <div className="scorecard-subtitle">36-Month Total</div>
+              {showNetworkEffects && (
+                <div className="scorecard-badge">
+                  {(displayCumulativeRetailer / cumulativeRetailer).toFixed(1)}× baseline
+                </div>
+              )}
             </div>
-            <div className="scorecard-subtitle">Per Opted-In Customer</div>
-          </div>
 
-          <div className="scorecard">
-            <div className="scorecard-label">CONSUMER EARNINGS</div>
-            <div className="scorecard-value">{formatCurrency(displayCumulativeConsumer)}</div>
-            <div className="scorecard-subtitle">36-Month Total</div>
-            {showNetworkEffects && (
-              <div className="scorecard-badge">
-                {(displayCumulativeConsumer / cumulativeConsumer).toFixed(1)}× baseline
+            <div className="scorecard">
+              <div className="scorecard-label">EBIT PER CUSTOMER</div>
+              <div className="scorecard-value">
+                ${((results.walmartEbitAnnualized * 3) / results.optedInCustomers).toFixed(2)}
               </div>
-            )}
-          </div>
-
-          <div className="scorecard">
-            <div className="scorecard-label">CONSUMER EARNINGS</div>
-            <div className="scorecard-value">
-              ${(displayCumulativeConsumer / 3 / optedInCustomers).toFixed(2)}/year
+              <div className="scorecard-subtitle">Per Opted-In Customer</div>
             </div>
-            <div className="scorecard-subtitle">Per Opted-In Customer</div>
-            {showNetworkEffects && (
-              <div className="scorecard-badge">
-                {((displayCumulativeConsumer / cumulativeConsumer)).toFixed(1)}× baseline
-              </div>
-            )}
-          </div>
 
-          <div className="scorecard">
-            <div className="scorecard-label">ACTIVE CERT POOL</div>
-            <div className="scorecard-value">{(displayActiveCerts / 1000000000).toFixed(2)}B</div>
-            <div className="scorecard-subtitle">Month 36</div>
-            {showNetworkEffects && (
-              <div className="scorecard-badge">
-                {(displayActiveCerts / month36.activeCertPool).toFixed(1)}× baseline
-              </div>
-            )}
-          </div>
-        </div>
+            <div className="scorecard">
+              <div className="scorecard-label">CONSUMER EARNINGS</div>
+              <div className="scorecard-value">{formatCurrency(displayCumulativeConsumer)}</div>
+              <div className="scorecard-subtitle">36-Month Total</div>
+              {showNetworkEffects && (
+                <div className="scorecard-badge">
+                  {(displayCumulativeConsumer / cumulativeConsumer).toFixed(1)}× baseline
+                </div>
+              )}
+            </div>
 
-        {/* Key Insight Box */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-8 border-l-4 border-blue-600 shadow-lg">
-          <div className="font-bold text-xl text-gray-900 mb-4">KEY INSIGHT</div>
+            <div className="scorecard">
+              <div className="scorecard-label">CONSUMER EARNINGS</div>
+              <div className="scorecard-value">
+                ${(displayCumulativeConsumer / 3 / optedInCustomers).toFixed(2)}/year
+              </div>
+              <div className="scorecard-subtitle">Per Opted-In Customer</div>
+              {showNetworkEffects && (
+                <div className="scorecard-badge">
+                  {((displayCumulativeConsumer / cumulativeConsumer)).toFixed(1)}× baseline
+                </div>
+              )}
+            </div>
+
+            <div className="scorecard">
+              <div className="scorecard-label">ACTIVE CERT POOL</div>
+              <div className="scorecard-value">{(displayActiveCerts / 1000000000).toFixed(2)}B</div>
+              <div className="scorecard-subtitle">Month 36</div>
+              {showNetworkEffects && (
+                <div className="scorecard-badge">
+                  {(displayActiveCerts / month36.activeCertPool).toFixed(1)}× baseline
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Network Effects Info Section (Dynamic) */}
+        <div className="network-effects-info">
+          <div className="flex items-start gap-2 mb-4">
+            <span className="text-blue-600 text-lg">ℹ️</span>
+            <div>
+              <span className="font-bold text-gray-900 text-base">
+                Understanding Network Effects
+              </span>
+            </div>
+          </div>
           {!showNetworkEffects ? (
-            <>
-              <p className="text-gray-700 text-lg leading-relaxed mb-3">
-                At {formatPercent(effectiveOptIn)} participation ({formattedOptedInM}M customers), 
-                Walmart generates {formatCurrency(annualWalmartRevenue)} annually from certificates 
-                created from existing transactions. That's {formattedGMVPercent}% of GMV—a modest 
-                data dividend that rewards participating consumers ${formattedEarningsPerYear} per year.
-              </p>
-              <p className="text-gray-600 text-base">
-                <strong>{customMode ? 'Custom' : scenario} scenario:</strong> {getScenarioDescription(scenario, avgCertsPerTrip, assumptions)}
-              </p>
-            </>
+            <p className="text-base text-gray-700 leading-relaxed">
+              Networked participation makes every certificate more valuable. To see the impact of these effects, 
+              toggle the Network Effects checkbox above to view impact.
+            </p>
           ) : (
-            <>
-              <p className="text-gray-700 text-lg leading-relaxed mb-3">
-                With {formattedOptedInM}M participating customers ({formatPercent(effectiveOptIn)}), 
-                the 5-retailer network makes certificates {networkMultiplier.toFixed(2)}× more valuable. 
-                Walmart generates {formatCurrency(annualWalmartRevenue)} annually while participating 
-                consumers earn ${formattedEarningsPerYear} per year—a {((networkMultiplier - 1) * 100).toFixed(0)}% 
-                boost from network effects.
-              </p>
-              <p className="text-gray-600 text-base">
-                <strong>Network Effect:</strong> Brands pay a premium for cross-retailer insights. 
-                This is value creation, not redistribution—Walmart earns on their own certificates, 
-                they just become more valuable in a larger network.
-              </p>
-            </>
+            <p className="text-base text-gray-700 leading-relaxed">
+              Network participation makes every certificate more valuable. With five retailers active, 
+              Walmart's certificates gain <strong>+{results.networkLiftDisplayPercent.toFixed(0)}% lift</strong>, driving{' '}
+              <strong>{formatCurrency(annualWalmartRevenue)}</strong> in annual revenue while 
+              consumers earn <strong>${formattedEarningsPerYear} per year</strong>—proof that collaboration 
+              multiplies value rather than divides it.
+            </p>
           )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row justify-center gap-6 pt-4">
-          <button
-            onClick={() => setActiveView('standalone')}
-            className="action-button action-button-primary"
-          >
-            Explore Standalone Model →
-          </button>
-          <button
-            onClick={() => setActiveView('network')}
-            className="action-button action-button-secondary"
-          >
-            See Network Effects →
-          </button>
         </div>
       </div>
     );
@@ -1476,7 +1465,7 @@ export default function DrumWaveWalmartTool() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Model Details & Assumptions</h2>
-        <div className="text-sm text-green-600 font-semibold">✓ Validated against DrumWave Financial Model v1.0</div>
+        <div className="text-sm text-green-600 font-semibold">✓ Validated against DrumWave Multisided Marketplace Model v1.1</div>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
@@ -1488,10 +1477,10 @@ export default function DrumWaveWalmartTool() {
             to model skeptical/realistic/enthusiastic market responses.
           </p>
         </div>
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-x-6 gap-y-8">
           <div>
             <div className="font-semibold text-gray-700 mb-2">Customer Base</div>
-            <ul className="space-y-1 text-sm text-gray-600">
+            <ul className="space-y-2 text-sm text-gray-600" style={{ listStyle: 'none', paddingLeft: '0' }}>
               <li>• Total Eligible: {formatNumber(assumptions.totalCustomers, 0)} customers</li>
               <li>• dWallet Adoption: {formatPercent(assumptions.dwalletAdoption)}</li>
               <li>• Active Consent: {formatPercent(assumptions.activeConsent)}</li>
@@ -1500,21 +1489,21 @@ export default function DrumWaveWalmartTool() {
           </div>
           <div>
             <div className="font-semibold text-gray-700 mb-2">Transaction Volume</div>
-            <ul className="space-y-1 text-sm text-gray-600">
+            <ul className="space-y-2 text-sm text-gray-600" style={{ listStyle: 'none', paddingLeft: '0' }}>
               <li>• Annual Txns per Customer: {assumptions.annualTransactions}</li>
               <li>• Monthly: {(assumptions.annualTransactions / 12).toFixed(2)}</li>
             </ul>
           </div>
           <div>
             <div className="font-semibold text-gray-700 mb-2">Brand Participation</div>
-            <ul className="space-y-1 text-sm text-gray-600">
+            <ul className="space-y-2 text-sm text-gray-600" style={{ listStyle: 'none', paddingLeft: '0' }}>
               <li>• Ramp: {formatPercent(assumptions.brandStartPct)} → {formatPercent(assumptions.brandEndPct)} over {assumptions.monthsToFull} months</li>
               <li>• Curve: Sigmoid (inflection at month {assumptions.monthsToFull / 2})</li>
             </ul>
           </div>
           <div>
             <div className="font-semibold text-gray-700 mb-2">Pricing</div>
-            <ul className="space-y-1 text-sm text-gray-600">
+            <ul className="space-y-2 text-sm text-gray-600" style={{ listStyle: 'none', paddingLeft: '0' }}>
               <li>• Minting Fee: ${assumptions.mintingFee.toFixed(2)}</li>
               <li>• Consented Re-Use License Fee: ${assumptions.licenseFee.toFixed(3)}</li>
               <li>• Reuse Rate: {assumptions.usesPerCertPerYear}× per year</li>
@@ -1523,7 +1512,7 @@ export default function DrumWaveWalmartTool() {
           </div>
           <div>
             <div className="font-semibold text-gray-700 mb-2">Eligible Items</div>
-            <ul className="space-y-1 text-sm text-gray-600">
+            <ul className="space-y-2 text-sm text-gray-600" style={{ listStyle: 'none', paddingLeft: '0' }}>
               <li>• Dynamic Range: {assumptions.itemFloor} → {assumptions.itemCeiling} items</li>
               <li>• Varies with brand participation</li>
             </ul>
@@ -1749,7 +1738,7 @@ export default function DrumWaveWalmartTool() {
 
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Validation & Export</h3>
-        <ul className="space-y-2 text-sm text-gray-600 mb-4">
+        <ul className="space-y-2 text-sm text-gray-600 mb-4" style={{ listStyle: 'none', paddingLeft: '0' }}>
           <li>• Base scenario validated against Excel model (Month 36: ${(month36.retailerTotal / 1000000).toFixed(1)}M)</li>
           <li>• All calculations deterministic (no randomness)</li>
           <li>• Network projections use conservative multipliers</li>

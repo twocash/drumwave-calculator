@@ -1,0 +1,103 @@
+/* Scenario Info Box Styles - Matches mockup design */
+.scenario-info-box {
+  background: white;
+  border: 2px solid #3b82f6;
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.scenario-info-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+/* Left side - Current Model */
+.scenario-info-left {
+  flex: 1;
+}
+
+.scenario-info-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+.scenario-info-params {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 0.375rem;
+}
+
+.scenario-info-adjust {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: #2563eb;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.scenario-info-adjust:hover {
+  color: #1d4ed8;
+}
+
+.scenario-info-icon {
+  font-size: 1rem;
+  font-weight: normal;
+}
+
+/* Right side - Network Effects Toggle */
+.scenario-info-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.scenario-info-checkbox-container {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.scenario-info-checkbox {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-right: 0.5rem;
+  cursor: pointer;
+  accent-color: #2563eb;
+}
+
+.scenario-info-checkbox-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  user-select: none;
+}
+
+.scenario-info-network-status {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .scenario-info-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .scenario-info-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
